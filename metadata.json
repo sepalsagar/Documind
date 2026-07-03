@@ -1,0 +1,6 @@
+{
+  "name": "DocuMind - Semantic Document Intelligence",
+  "description": "Intelligent semantic document search and grounded RAG platform for PDFs with citations and vector embeddings.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
