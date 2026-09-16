@@ -6,12 +6,12 @@ import { connectToDatabase } from '@/lib/db';
 import { clampTopK, retrieveRelevantChunks, validateCitations } from '@/lib/rag';
 import { DocumentModel } from '@/models/Document';
 
-const GENERATION_MODEL = process.env.GEMINI_GENERATION_MODEL || 'gemini-3.6-flash';
+const GENERATION_MODEL = 'gemini-3.6-flash';
 const NO_EVIDENCE_ANSWER = "I couldn't find enough relevant information in this document to answer that question.";
 
 function getAiClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('Gemini is not configured.');
+  if (!apiKey) throw new Error('The generation provider is not configured.');
   return new GoogleGenAI({ apiKey });
 }
 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       config: { temperature: 0.2 },
     });
     const answer = response.text?.trim();
-    if (!answer) throw new Error('Gemini returned an empty response.');
+    if (!answer) throw new Error('The generation provider returned an empty response.');
     return NextResponse.json({ answer: validateCitations(answer, sources.map((source) => source.id)), sources });
   } catch (error) {
     console.error('RAG request failed', error);

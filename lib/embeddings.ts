@@ -20,7 +20,7 @@ function getGenAIClient(): GoogleGenAI {
     apiKey,
     httpOptions: {
       headers: {
-        'User-Agent': 'aistudio-build',
+        'User-Agent': 'documind-ingestion',
       },
     },
   });
@@ -28,7 +28,7 @@ function getGenAIClient(): GoogleGenAI {
 }
 
 /**
- * Generates vector embeddings for a given text using Gemini's embedding model.
+ * Generates vector embeddings for a given text using the configured embedding model.
  *
  * @param text The input text to embed.
  * @returns Array of floating-point numbers representing the dense vector.
@@ -52,14 +52,14 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 
     if (!values || !Array.isArray(values) || values.length === 0) {
       throw new Error(
-        'Gemini API returned an empty or invalid embedding vector payload.'
+        'The embedding provider returned an empty or invalid embedding vector payload.'
       );
     }
 
     return values;
   } catch (error: any) {
     throw new Error(
-      `Failed to generate Gemini embedding with model '${EMBEDDING_MODEL}': ${
+      `Failed to generate embedding with model '${EMBEDDING_MODEL}': ${
         error?.message || error
       }`
     );

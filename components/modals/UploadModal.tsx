@@ -99,7 +99,7 @@ const UploadModalDialog: React.FC<{
     const t2 = setTimeout(() => {
       setStep('embeddings');
       setProgress(75);
-      setStatusMessage('Creating chunks and generating Gemini embeddings...');
+      setStatusMessage('Creating chunks and generating semantic embeddings...');
     }, 3200);
 
     try {
@@ -165,7 +165,7 @@ const UploadModalDialog: React.FC<{
             <div>
               <h3 className="text-base text-slate-800 font-bold">Upload a document</h3>
               <p className="text-[11px] text-slate-400 font-normal">
-                Real PDF parsing & Gemini vector embedding pipeline
+                Real PDF parsing & semantic vector embedding pipeline
               </p>
             </div>
           </div>

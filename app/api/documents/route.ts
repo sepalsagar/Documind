@@ -15,7 +15,7 @@ function formatDocument(document: IDocument & { _id: mongoose.Types.ObjectId }, 
     fileSize: `${(document.fileSize / 1024 / 1024).toFixed(2)} MB`, pageCount: document.pageCount,
     chunkCount, status: document.status === 'ready' ? 'Ready' : document.status === 'failed' ? 'Failed' : 'Processing',
     rawStatus: document.status, uploadDate: new Date(document.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-    createdAt: document.createdAt.toISOString(), updatedAt: document.updatedAt.toISOString(), embeddingModel: 'gemini-embedding-2-preview',
+    createdAt: document.createdAt.toISOString(), updatedAt: document.updatedAt.toISOString(), embeddingModel: 'semantic-embedding-v1',
   };
 }
 

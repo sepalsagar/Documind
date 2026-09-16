@@ -261,7 +261,7 @@ export const WorkspaceScreen: React.FC<WorkspaceScreenProps> = ({
                   Model
                 </span>
                 <span className="font-mono text-xs text-slate-700 font-medium block truncate">
-                  {doc.embeddingModel || 'gemini-emb-2'}
+                  {doc.embeddingModel || 'semantic-embedding-v1'}
                 </span>
               </div>
             </div>
@@ -373,7 +373,7 @@ export const WorkspaceScreen: React.FC<WorkspaceScreenProps> = ({
           </div>
         </div>
 
-        {/* CENTER PANEL: AI Synthesis Canvas & Chat (Col 5) */}
+        {/* CENTER PANEL: Grounded Answer Canvas & Chat (Col 5) */}
         <div className="lg:col-span-5 flex flex-col gap-4">
           {/* Query Prompts Card */}
           <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.04),0_8px_10px_-6px_rgba(0,0,0,0.02)] flex flex-col gap-2">

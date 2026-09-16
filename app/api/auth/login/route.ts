@@ -1,8 +1,13 @@
 import bcrypt from 'bcryptjs';
 import { NextRequest, NextResponse } from 'next/server';
+import { toAuthErrorResponse } from '@/lib/api-errors';
 import { authCookieOptions, AUTH_COOKIE_NAME, createAuthToken } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/db';
 import { User } from '@/models/User';
+
+// Authentication needs Node APIs (bcrypt, JWT) and must never be served from a cache.
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +23,6 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     console.error('Login failed', error);
-    return NextResponse.json({ error: 'Unable to sign in.' }, { status: 500 });
+    return toAuthErrorResponse(error, 'Unable to sign in.');
   }
 }

@@ -59,7 +59,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             </span>
           </div>
           <p className="text-sm text-slate-500">
-            Search and understand your documents with high-precision semantic AI.
+            Search and understand your documents with high-precision semantic retrieval.
           </p>
         </div>
 

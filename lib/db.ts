@@ -9,6 +9,12 @@ interface MongooseCache {
   promise: Promise<typeof mongoose> | null;
 }
 
+/** Thrown when a required server environment variable is missing. */
+export class DatabaseConfigurationError extends Error {}
+
+/** Thrown when MongoDB is configured but cannot be reached from this runtime. */
+export class DatabaseConnectionError extends Error {}
+
 declare global {
   var mongooseCache: MongooseCache | undefined;
 }
@@ -23,8 +29,8 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
   const uri = process.env.MONGODB_URI;
 
   if (!uri) {
-    throw new Error(
-      'MONGODB_URI environment variable is not defined. Please configure MONGODB_URI in your environment settings.'
+    throw new DatabaseConfigurationError(
+      'MONGODB_URI environment variable is not defined. Configure MONGODB_URI in your deployment environment settings.'
     );
   }
 
@@ -36,6 +42,8 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
     const opts: mongoose.ConnectOptions = {
       bufferCommands: false,
       maxPoolSize: 10,
+      // Fail fast so a serverless runtime returns a clear error instead of a platform timeout.
+      serverSelectionTimeoutMS: 10000,
     };
 
     cached!.promise = mongoose.connect(uri, opts).then((mongooseInstance) => {
@@ -45,9 +53,13 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
 
   try {
     cached!.conn = await cached!.promise;
-  } catch (e) {
+  } catch (cause) {
     cached!.promise = null;
-    throw e;
+    const error = new DatabaseConnectionError(
+      'Unable to connect to MongoDB. Verify MONGODB_URI and that MongoDB Atlas network access allows this deployment.'
+    );
+    (error as { cause?: unknown }).cause = cause;
+    throw error;
   }
 
   return cached!.conn;

@@ -6,9 +6,17 @@ interface AuthPayload { id: string; email?: string }
 export const AUTH_COOKIE_NAME = 'auth_token';
 export const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 
+/** Thrown when the server is missing the JWT signing secret. */
+export class AuthConfigurationError extends Error {}
+
+/** True when the server has everything required to issue and verify sessions. */
+export function isAuthConfigured(): boolean {
+  return Boolean(process.env.JWT_SECRET);
+}
+
 export function createAuthToken(user: AuthPayload): string {
   const secret = process.env.JWT_SECRET;
-  if (!secret) throw new Error('JWT_SECRET environment variable is not configured.');
+  if (!secret) throw new AuthConfigurationError('JWT_SECRET environment variable is not configured.');
   return jwt.sign(user, secret, { expiresIn: AUTH_COOKIE_MAX_AGE });
 }
 

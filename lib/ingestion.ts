@@ -26,7 +26,7 @@ function chunkPage(text: string): string[] {
   return chunks;
 }
 
-/** Extracts real text from PDF pages, chunks it, then embeds those chunks with Gemini. */
+/** Extracts real text from PDF pages, chunks it, then embeds each chunk for semantic retrieval. */
 export async function ingestPdf(buffer: Buffer): Promise<{ pageCount: number; chunks: IngestedChunk[] }> {
   const pages: string[] = [];
   const parsed = await (pdf as any)(buffer, {

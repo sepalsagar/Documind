@@ -527,7 +527,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
                   <div>
                     <span className="text-[14.5px] text-slate-900 block font-bold">
-                      OpenAI text-embedding-3-small
+                      Semantic Embedding Model v1
                     </span>
                     <span className="font-mono text-[11.5px] text-teal-700 font-medium">
                       (Default Active)
@@ -535,7 +535,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   </div>
 
                   <p className="text-[12.5px] text-slate-600 leading-relaxed">
-                    1536-dimension vectors with cosine similarity matching via Atlas Vector Search.
+                    Dense vector embeddings with cosine similarity ranking over page-aware chunks.
                   </p>
 
                   <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
@@ -544,7 +544,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     </span>
                     <button
                       type="button"
-                      onClick={() => alert('Switched to Gemini text-embedding-004 with 768 dimensions')}
+                      onClick={() => alert('Embedding model selection is managed by the server configuration.')}
                       className="text-[12px] text-teal-700 hover:text-teal-800 font-semibold flex items-center gap-0.5"
                     >
                       <span>Switch model</span>
@@ -589,7 +589,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     <span className="font-mono text-[11px] text-slate-500">(Build 2026.09)</span>
                   </div>
                   <p className="text-[13.5px] text-slate-600 max-w-2xl leading-relaxed">
-                    AI-powered document understanding with grounded retrieval. Built with Next.js,
+                    Grounded document understanding with evidence-backed retrieval. Built with Next.js,
                     TypeScript, and vector embeddings.
                   </p>
                 </div>
@@ -729,7 +729,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   </div>
                   <span className="text-[12px] text-slate-600 max-w-xl">
                     Permanently purge your account, all associated vector collections, ingested PDFs,
-                    and AI synthesis history. This action cannot be reversed.
+                    and answer synthesis history. This action cannot be reversed.
                   </span>
                 </div>
                 <button
