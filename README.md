@@ -414,7 +414,7 @@ production compile.
 DocuMind is designed to run on Vercel with MongoDB Atlas.
 
 Live Demo:
-http://documind-git-main-sagar-e85d.vercel.app/
+https://documind-zeta-fawn.vercel.app/
 
 **Steps**
 
