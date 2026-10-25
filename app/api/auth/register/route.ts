@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createUser, findUserByEmail } from '@/lib/store';
 import { hashPassword, signToken } from '@/lib/auth';
+import { consumeRateLimit } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const rate = await consumeRateLimit(`auth:register:${ip}`, 5, 15 * 60 * 1000);
+    if (!rate.allowed) {
+      return NextResponse.json({ error: 'Too many registration attempts. Please try again later.' }, {
+        status: 429,
+        headers: { 'Retry-After': String(rate.retryAfterSeconds) },
+      });
+    }
     const body = await req.json();
     const { name, email, password, confirmPassword } = body;
 
@@ -75,7 +84,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Registration error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error during registration' },
+      { error: 'Unable to create your account right now. Please try again.' },
       { status: 500 }
     );
   }

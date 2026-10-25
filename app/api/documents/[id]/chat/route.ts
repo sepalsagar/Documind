@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
 import { getDocumentById, getDocumentChunks } from '@/lib/store';
 import { generateEmbedding, retrieveTopK, generateGroundedAnswer } from '@/lib/rag';
+import { consumeRateLimit } from '@/lib/rate-limit';
 
 export async function POST(
   req: NextRequest,
@@ -11,6 +12,13 @@ export async function POST(
     const authUser = getUserFromRequest(req);
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized. Please sign in.' }, { status: 401 });
+    }
+    const rate = await consumeRateLimit(`user:query:${authUser.userId}`, 60, 60 * 60 * 1000);
+    if (!rate.allowed) {
+      return NextResponse.json({ error: 'Query limit reached. Please try again later.' }, {
+        status: 429,
+        headers: { 'Retry-After': String(rate.retryAfterSeconds) },
+      });
     }
 
     const { id } = await params;
@@ -37,6 +45,9 @@ export async function POST(
     // Question length sanity check
     if (question.length > 2000) {
       return NextResponse.json({ error: 'Question is too long (max 2000 characters).' }, { status: 400 });
+    }
+    if (topK !== undefined && (!Number.isInteger(topK) || topK < 1 || topK > 5)) {
+      return NextResponse.json({ error: 'topK must be an integer between 1 and 5.' }, { status: 400 });
     }
 
     // 1. Fetch document chunks
@@ -93,9 +104,6 @@ export async function POST(
     });
   } catch (error: any) {
     console.error('RAG Chat route error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error during RAG query.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Unable to answer this question right now. Please try again.' }, { status: 500 });
   }
 }

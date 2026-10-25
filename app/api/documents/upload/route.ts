@@ -2,15 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
 import { createDocument, createDocumentChunks, updateDocument } from '@/lib/store';
 import { extractTextFromPdf, chunkDocument, generateEmbedding } from '@/lib/rag';
+import { consumeRateLimit } from '@/lib/rate-limit';
 
-// Max file size: 10 MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_PAGE_COUNT = 100;
 
 export async function POST(req: NextRequest) {
   try {
     const authUser = getUserFromRequest(req);
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized. Please sign in.' }, { status: 401 });
+    }
+    const rate = await consumeRateLimit(`user:upload:${authUser.userId}`, 10, 60 * 60 * 1000);
+    if (!rate.allowed) {
+      return NextResponse.json({ error: 'Upload limit reached. Please try again later.' }, {
+        status: 429,
+        headers: { 'Retry-After': String(rate.retryAfterSeconds) },
+      });
     }
 
     const formData = await req.formData();
@@ -29,12 +37,10 @@ export async function POST(req: NextRequest) {
     }
 
     const filename = file.name || 'document.pdf';
-    const isPdf = filename.toLowerCase().endsWith('.pdf') || file.type.includes('pdf');
-    if (!isPdf) {
-      return NextResponse.json(
-        { error: 'Invalid file format. Please upload a valid PDF document.' },
-        { status: 400 }
-      );
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    if (buffer.length < 5 || buffer.subarray(0, 5).toString('ascii') !== '%PDF-') {
+      return NextResponse.json({ error: 'Invalid file format. Please upload a valid PDF document.' }, { status: 400 });
     }
 
     // Create initial processing document record
@@ -47,16 +53,15 @@ export async function POST(req: NextRequest) {
       status: 'Processing',
     });
 
-    // Read file bytes
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
     try {
       // 1. PDF Text Extraction
       const extraction = await extractTextFromPdf(buffer);
 
       if (!extraction.fullText || extraction.fullText.trim().length === 0) {
-        throw new Error('No readable text could be extracted from this PDF.');
+        throw new Error('This PDF does not contain selectable text. Scanned PDFs need OCR before they can be searched.');
+      }
+      if (extraction.pageCount > MAX_PAGE_COUNT) {
+        throw new Error(`This PDF has more than ${MAX_PAGE_COUNT} pages. Please upload a shorter document.`);
       }
 
       // 2. Chunking
@@ -111,9 +116,6 @@ export async function POST(req: NextRequest) {
     }
   } catch (error: any) {
     console.error('Upload route error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error during upload.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Unable to upload the document right now. Please try again.' }, { status: 500 });
   }
 }

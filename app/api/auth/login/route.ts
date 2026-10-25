@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { findUserByEmail } from '@/lib/store';
 import { comparePassword, signToken } from '@/lib/auth';
+import { consumeRateLimit } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const rate = await consumeRateLimit(`auth:login:${ip}`, 10, 15 * 60 * 1000);
+    if (!rate.allowed) {
+      return NextResponse.json({ error: 'Too many sign-in attempts. Please try again later.' }, {
+        status: 429,
+        headers: { 'Retry-After': String(rate.retryAfterSeconds) },
+      });
+    }
     const body = await req.json();
     const { email, password } = body;
 
@@ -57,7 +66,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Login error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error during login' },
+      { error: 'Unable to sign in right now. Please try again.' },
       { status: 500 }
     );
   }
