@@ -129,13 +129,6 @@ export default function LoginView({ onSwitchToRegister }: LoginViewProps) {
                 >
                   Password
                 </label>
-                <button
-                  type="button"
-                  onClick={() => {}}
-                  className="text-xs text-teal-600 hover:text-teal-700 font-medium"
-                >
-                  Forgot password?
-                </button>
               </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -159,18 +152,6 @@ export default function LoginView({ onSwitchToRegister }: LoginViewProps) {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center space-x-2 text-xs text-slate-600 cursor-pointer">
-                <input
-                  id="remember_me_checkbox"
-                  type="checkbox"
-                  defaultChecked
-                  className="rounded border-slate-300 text-teal-600 focus:ring-teal-500"
-                />
-                <span>Remember for 30 days</span>
-              </label>
             </div>
 
             <button

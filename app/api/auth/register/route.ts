@@ -9,7 +9,8 @@ export async function POST(req: NextRequest) {
     const ip = getVercelClientIp(req);
     const rate = await consumeRateLimit(`auth:register:${ip}`, 20, 60 * 60 * 1000);
     if (!rate.allowed) {
-      return NextResponse.json({ error: 'Too many registration attempts. Please try again later.' }, {
+      const minutes = Math.max(1, Math.ceil(rate.retryAfterSeconds / 60));
+      return NextResponse.json({ error: `Too many attempts, try again in ${minutes} minute${minutes === 1 ? '' : 's'}.` }, {
         status: 429,
         headers: { 'Retry-After': String(rate.retryAfterSeconds) },
       });
@@ -26,9 +27,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 });
     }
 
-    if (!password || typeof password !== 'string' || password.length < 6) {
+    if (!password || typeof password !== 'string' || password.length < 8) {
       return NextResponse.json(
-        { error: 'Password must be at least 6 characters long' },
+        { error: 'Password must be at least 8 characters long' },
         { status: 400 }
       );
     }
@@ -84,6 +85,9 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (error: any) {
     console.error('Registration error:', error);
+    if (error?.code === 11000) {
+      return NextResponse.json({ error: 'Email already registered.' }, { status: 409 });
+    }
     return NextResponse.json(
       { error: 'Unable to create your account right now. Please try again.' },
       { status: 500 }

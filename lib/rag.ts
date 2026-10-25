@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { extractText } from 'unpdf';
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({
@@ -78,23 +79,16 @@ export function assertUsableDocumentText(text: string): void {
  * 1. PDF Text Extraction
  */
 export async function extractTextFromPdf(buffer: Buffer): Promise<ExtractedPdfResult> {
-  const pdfParseMod: any = await import('pdf-parse');
-  if (typeof pdfParseMod.PDFParse !== 'function') {
-    throw new Error('The PDF text parser is unavailable in this runtime.');
-  }
-
-  const parser = new pdfParseMod.PDFParse({ data: buffer });
-  const textResult = await parser.getText();
-  const fullText = (textResult?.text || '').replace(/\s+/g, ' ').trim();
-  const pageCount = Math.max(1, textResult?.total || 1);
-  const pages = Array.isArray(textResult?.pages)
-    ? textResult.pages
-        .map((page: any, index: number) => ({
-          pageNumber: page.num || index + 1,
-          text: (page.text || '').replace(/\s+/g, ' ').trim(),
-        }))
-        .filter((page: ExtractedPage) => page.text.length > 0)
-    : [];
+  const textResult = await extractText(new Uint8Array(buffer), { mergePages: false });
+  const pageTexts = Array.isArray(textResult.text) ? textResult.text : [textResult.text];
+  const pages = pageTexts
+    .map((text, index) => ({
+      pageNumber: index + 1,
+      text: text.replace(/\s+/g, ' ').trim(),
+    }))
+    .filter((page) => page.text.length > 0);
+  const fullText = pages.map((page) => page.text).join(' ').replace(/\s+/g, ' ').trim();
+  const pageCount = Math.max(1, textResult.totalPages || 1);
 
   assertUsableDocumentText(fullText);
   if (pages.length === 0) {

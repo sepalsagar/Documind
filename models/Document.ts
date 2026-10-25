@@ -41,5 +41,10 @@ const DocumentSchema = new Schema<IDocument>(
   }
 );
 
+DocumentSchema.index(
+  { userId: 1, isTemplate: 1 },
+  { unique: true, partialFilterExpression: { isTemplate: true } }
+);
+
 export const DocumentModel =
   mongoose.models.Document || mongoose.model<IDocument>('Document', DocumentSchema);

@@ -90,6 +90,7 @@ if (!global.documindStore) {
 }
 
 const memoryStore = global.documindStore;
+let demoTemplatePromise: Promise<void> | null = null;
 
 // Helper to generate simple ID
 function generateId(): string {
@@ -162,6 +163,7 @@ export async function createDemoUser(templateUserId = '__demo_template__'): Prom
 
   if (db) {
     try {
+      await ensureDemoTemplate(templateUserId);
       const user = await UserModel.create({
         name: 'Demo Researcher',
         email,
@@ -172,6 +174,50 @@ export async function createDemoUser(templateUserId = '__demo_template__'): Prom
       const template = await DocumentModel.findOne({ isTemplate: true, userId: templateUserId }).lean();
       if (!template) {
         return { id: user._id.toString(), name: user.name, email: user.email, isDemo: true, expiresAt, documentId: null };
+      }
+
+      async function ensureDemoTemplate(templateUserId: string): Promise<void> {
+        if (demoTemplatePromise) return demoTemplatePromise;
+        demoTemplatePromise = (async () => {
+          const db = await connectToDatabase();
+          if (!db) return;
+          const existing = await DocumentModel.findOne({ isTemplate: true, userId: templateUserId }).select('_id').lean();
+          if (existing) return;
+
+          const text = [
+            'Northstar Labs Leave and Expense Policy',
+            'Leave: full-time employees accrue 1.5 paid leave days each month. Submit leave requests five working days before the first day away.',
+            'Expenses: business travel requires manager pre-approval. Submit itemized receipts within 30 days of the expense.',
+            'Questions about exceptions should be sent to People Operations.',
+          ].join(' ');
+          const { generateEmbedding } = await import('./rag');
+          try {
+            const template = await DocumentModel.create({
+              userId: templateUserId,
+              title: 'Northstar Labs Leave and Expense Policy.pdf',
+              originalName: 'northstar-leave-expense-policy.pdf',
+              fileSize: 0,
+              pageCount: 3,
+              chunkCount: 1,
+              status: 'Ready',
+              isTemplate: true,
+            });
+            await DocumentChunkModel.create({
+              documentId: template._id.toString(),
+              chunkIndex: 0,
+              pageNumber: 2,
+              text,
+              embedding: await generateEmbedding(text),
+              tokenCount: Math.round(text.split(/\s+/).length * 1.3),
+              isTemplate: true,
+            });
+          } catch (error: any) {
+            if (error?.code !== 11000) throw error;
+          }
+        })().finally(() => {
+          demoTemplatePromise = null;
+        });
+        return demoTemplatePromise;
       }
       const cloned = await DocumentModel.create({
         userId: user._id.toString(),
