@@ -183,7 +183,38 @@ export async function createDemoUser(templateUserId = '__demo_template__'): Prom
     isDemo: true,
     expiresAt,
   });
-  const template = Array.from(memoryStore.documents.values()).find((doc) => doc.isTemplate && doc.userId === templateUserId);
+  let template = Array.from(memoryStore.documents.values()).find((doc) => doc.isTemplate && doc.userId === templateUserId);
+  if (!template) {
+    const templateId = generateId();
+    const templateText = 'Northstar Labs leave policy: employees accrue 1.5 paid leave days each month and should submit requests five working days ahead. Expense policy: business travel needs pre-approval and itemized receipts must be submitted within 30 days.';
+    const { generateEmbedding } = await import('./rag');
+    template = {
+      _id: templateId,
+      userId: templateUserId,
+      title: 'Northstar Labs Leave & Expense Policy.pdf',
+      originalName: 'northstar-leave-expense-policy.pdf',
+      fileSize: 0,
+      pageCount: 3,
+      chunkCount: 1,
+      status: 'Ready',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      isTemplate: true,
+    };
+    memoryStore.documents.set(templateId, template);
+    const chunkId = generateId();
+    memoryStore.chunks.set(chunkId, {
+      _id: chunkId,
+      documentId: templateId,
+      chunkIndex: 0,
+      pageNumber: 2,
+      text: templateText,
+      embedding: await generateEmbedding(templateText),
+      tokenCount: 34,
+      createdAt: new Date(),
+      isTemplate: true,
+    });
+  }
   let documentId: string | null = null;
   if (template) {
     documentId = generateId();

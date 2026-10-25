@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
-import { useAuth } from './AuthContext';
+import { AuthProvider, useAuth } from './AuthContext';
 
-export default function DemoButton({ className = '' }: { className?: string }) {
+function DemoButtonAction({ className = '' }: { className?: string }) {
   const { demo } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -23,4 +23,8 @@ export default function DemoButton({ className = '' }: { className?: string }) {
       {loading ? 'Starting demo…' : 'Try the demo'}
     </button>
   );
+}
+
+export default function DemoButton({ className = '' }: { className?: string }) {
+  return <AuthProvider><DemoButtonAction className={className} /></AuthProvider>;
 }

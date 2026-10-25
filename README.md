@@ -46,6 +46,26 @@ demo data expires after 24 hours.
    `npm test`
 5. Seed the demo template in the configured MongoDB database:
    `npm run seed:demo`
+6. Capture screenshots against a local dev server:
+   `npm run dev` in one terminal, then `npm run screenshots` in another.
+
+## Screenshots
+
+![DocuMind landing page](https://github.com/sepalsagar/Documind/raw/main/screenshots/landing.png)
+
+![DocuMind app with sample document](https://github.com/sepalsagar/Documind/raw/main/screenshots/app-sample-document.png)
+
+![DocuMind chat answer with citations](https://github.com/sepalsagar/Documind/raw/main/screenshots/chat-citations.png)
+
+![DocuMind sources and citation view](https://github.com/sepalsagar/Documind/raw/main/screenshots/sources-citation-view.png)
+
+![DocuMind login page](https://github.com/sepalsagar/Documind/raw/main/screenshots/login.png)
+
+![DocuMind mobile chat](https://github.com/sepalsagar/Documind/raw/main/screenshots/mobile-chat.png)
+
+Live app: https://documind-zeta-fawn.vercel.app/
+
+Try the demo from the landing page without signing up.
 
 The existing end-to-end QA script is available as `npm run qa` and requires a
 configured `JWT_SECRET`.
