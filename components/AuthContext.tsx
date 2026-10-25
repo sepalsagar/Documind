@@ -6,6 +6,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  isDemo?: boolean;
 }
 
 interface AuthContextType {
@@ -14,6 +15,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (name: string, email: string, password: string, confirmPassword?: string) => Promise<{ success: boolean; error?: string }>;
+  demo: () => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updateUser: (data: Partial<User>) => void;
 }
@@ -104,6 +106,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const demo = async () => {
+    try {
+      const res = await fetch('/api/auth/demo', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.error || 'Unable to start the demo' };
+      setUser(data.user);
+      setToken(null);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error while starting the demo' };
+    }
+  };
+
   const updateUser = (data: Partial<User>) => {
     if (user) {
       setUser({ ...user, ...data });
@@ -111,7 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, demo, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -8,6 +8,9 @@ export interface IDocumentChunk extends MongooseDocument {
   embedding: number[];
   tokenCount: number;
   createdAt: Date;
+  isDemo?: boolean;
+  isTemplate?: boolean;
+  expiresAt?: Date;
 }
 
 const DocumentChunkSchema = new Schema<IDocumentChunk>(
@@ -19,6 +22,9 @@ const DocumentChunkSchema = new Schema<IDocumentChunk>(
     embedding: { type: [Number], required: true },
     tokenCount: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now },
+    isDemo: { type: Boolean, default: false, index: true },
+    isTemplate: { type: Boolean, default: false, index: true },
+    expiresAt: { type: Date, index: true, expires: 0 },
   },
   {
     timestamps: true,

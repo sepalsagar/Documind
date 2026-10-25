@@ -13,12 +13,25 @@ export async function POST(
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized. Please sign in.' }, { status: 401 });
     }
-    const rate = await consumeRateLimit(`user:query:${authUser.userId}`, 60, 60 * 60 * 1000);
+    const rate = await consumeRateLimit(
+      `user:query:${authUser.userId}`,
+      authUser.isDemo ? 15 : 60,
+      60 * 60 * 1000
+    );
     if (!rate.allowed) {
-      return NextResponse.json({ error: 'Query limit reached. Please try again later.' }, {
+      return NextResponse.json({ error: authUser.isDemo ? 'Demo question limit reached. Create a free account to keep asking questions.' : 'Query limit reached. Please try again later.' }, {
         status: 429,
         headers: { 'Retry-After': String(rate.retryAfterSeconds) },
       });
+    }
+    if (authUser.isDemo) {
+      const daily = await consumeRateLimit('demo:questions:daily', 200, 24 * 60 * 60 * 1000);
+      if (!daily.allowed) {
+        return NextResponse.json({ error: 'The shared demo has reached today’s question limit. Please create a free account to continue.' }, {
+          status: 429,
+          headers: { 'Retry-After': String(daily.retryAfterSeconds) },
+        });
+      }
     }
 
     const { id } = await params;

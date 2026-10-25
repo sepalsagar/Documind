@@ -54,6 +54,13 @@ export default function Header({
         </div>
       </div>
 
+      {user?.isDemo && (
+        <div className="absolute left-1/2 top-16 hidden -translate-x-1/2 items-center gap-3 rounded-b-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-900 shadow-sm lg:flex">
+          <span>Demo workspace - data is deleted after 24 hours</span>
+          <a href="/register" className="font-bold text-teal-700 hover:underline">Create a free account</a>
+        </div>
+      )}
+
       {/* Right Controls */}
       <div className="flex items-center space-x-3">
         {/* System Online Status Badge */}

@@ -13,6 +13,9 @@ export async function POST(req: NextRequest) {
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized. Please sign in.' }, { status: 401 });
     }
+    if (authUser.isDemo) {
+      return NextResponse.json({ error: 'Demo workspaces cannot upload files. Create a free account to upload your own PDFs.' }, { status: 403 });
+    }
     const rate = await consumeRateLimit(`user:upload:${authUser.userId}`, 10, 60 * 60 * 1000);
     if (!rate.allowed) {
       return NextResponse.json({ error: 'Upload limit reached. Please try again later.' }, {

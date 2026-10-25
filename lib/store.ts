@@ -10,6 +10,8 @@ export interface MemoryUser {
   email: string;
   passwordHash: string;
   createdAt: Date;
+  isDemo?: boolean;
+  expiresAt?: Date;
 }
 
 export interface MemoryDocument {
@@ -24,6 +26,9 @@ export interface MemoryDocument {
   errorMessage?: string;
   createdAt: Date;
   updatedAt: Date;
+  isDemo?: boolean;
+  isTemplate?: boolean;
+  expiresAt?: Date;
 }
 
 export interface MemoryDocumentChunk {
@@ -35,6 +40,9 @@ export interface MemoryDocumentChunk {
   embedding: number[];
   tokenCount: number;
   createdAt: Date;
+  isDemo?: boolean;
+  isTemplate?: boolean;
+  expiresAt?: Date;
 }
 
 declare global {
@@ -112,6 +120,82 @@ export async function createUser(data: { name: string; email: string; passwordHa
   };
 }
 
+export async function createDemoUser(templateUserId = '__demo_template__'): Promise<{
+  id: string;
+  name: string;
+  email: string;
+  isDemo: true;
+  expiresAt: Date;
+  documentId: string | null;
+}> {
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const email = `demo-${generateId()}@documind.local`;
+  const db = await connectToDatabase();
+
+  if (db) {
+    try {
+      const user = await UserModel.create({
+        name: 'Demo Researcher',
+        email,
+        passwordHash: 'demo-account-no-password',
+        isDemo: true,
+        expiresAt,
+      });
+      const template = await DocumentModel.findOne({ isTemplate: true, userId: templateUserId }).lean();
+      if (!template) {
+        return { id: user._id.toString(), name: user.name, email: user.email, isDemo: true, expiresAt, documentId: null };
+      }
+      const cloned = await DocumentModel.create({
+        userId: user._id.toString(),
+        title: template.title,
+        originalName: template.originalName,
+        fileSize: template.fileSize,
+        pageCount: template.pageCount,
+        chunkCount: template.chunkCount,
+        status: template.status,
+        isDemo: true,
+        expiresAt,
+      });
+      const chunks = await DocumentChunkModel.find({ documentId: template._id.toString() }).lean();
+      await DocumentChunkModel.insertMany(chunks.map((chunk: any) => ({
+        documentId: cloned._id.toString(),
+        chunkIndex: chunk.chunkIndex,
+        pageNumber: chunk.pageNumber,
+        text: chunk.text,
+        embedding: chunk.embedding,
+        tokenCount: chunk.tokenCount,
+        isDemo: true,
+        expiresAt,
+      })));
+      return { id: user._id.toString(), name: user.name, email: user.email, isDemo: true, expiresAt, documentId: cloned._id.toString() };
+    } catch (error) {
+      console.warn('Demo user creation fell back to memory store:', error);
+    }
+  }
+
+  const userId = generateId();
+  memoryStore.users.set(userId, {
+    _id: userId,
+    name: 'Demo Researcher',
+    email,
+    passwordHash: 'demo-account-no-password',
+    createdAt: new Date(),
+    isDemo: true,
+    expiresAt,
+  });
+  const template = Array.from(memoryStore.documents.values()).find((doc) => doc.isTemplate && doc.userId === templateUserId);
+  let documentId: string | null = null;
+  if (template) {
+    documentId = generateId();
+    memoryStore.documents.set(documentId, { ...template, _id: documentId, userId, isDemo: true, isTemplate: false, expiresAt });
+    for (const chunk of Array.from(memoryStore.chunks.values()).filter((item) => item.documentId === template._id)) {
+      const chunkId = generateId();
+      memoryStore.chunks.set(chunkId, { ...chunk, _id: chunkId, documentId, isDemo: true, isTemplate: false, expiresAt });
+    }
+  }
+  return { id: userId, name: 'Demo Researcher', email, isDemo: true, expiresAt, documentId };
+}
+
 export async function findUserByEmail(email: string): Promise<MemoryUser | null> {
   const db = await connectToDatabase();
   const lowerEmail = email.toLowerCase().trim();
@@ -169,6 +253,9 @@ export async function createDocument(data: {
   fileSize: number;
   pageCount?: number;
   status?: DocumentStatus;
+  isDemo?: boolean;
+  isTemplate?: boolean;
+  expiresAt?: Date;
 }): Promise<MemoryDocument> {
   const db = await connectToDatabase();
 
@@ -182,6 +269,9 @@ export async function createDocument(data: {
         pageCount: data.pageCount || 1,
         chunkCount: 0,
         status: data.status || 'Processing',
+        isDemo: data.isDemo,
+        isTemplate: data.isTemplate,
+        expiresAt: data.expiresAt,
       });
       return {
         _id: doc._id.toString(),
@@ -210,6 +300,9 @@ export async function createDocument(data: {
     pageCount: data.pageCount || 1,
     chunkCount: 0,
     status: data.status || 'Processing',
+    isDemo: data.isDemo,
+    isTemplate: data.isTemplate,
+    expiresAt: data.expiresAt,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -388,6 +481,9 @@ export async function createDocumentChunks(
     text: string;
     embedding: number[];
     tokenCount: number;
+    isDemo?: boolean;
+    isTemplate?: boolean;
+    expiresAt?: Date;
   }>
 ): Promise<void> {
   const db = await connectToDatabase();
@@ -412,6 +508,9 @@ export async function createDocumentChunks(
       embedding: c.embedding,
       tokenCount: c.tokenCount,
       createdAt: new Date(),
+      isDemo: c.isDemo,
+      isTemplate: c.isTemplate,
+      expiresAt: c.expiresAt,
     });
   }
 }

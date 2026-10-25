@@ -11,6 +11,9 @@ export interface IDocument extends MongooseDocument {
   chunkCount: number;
   status: DocumentStatus;
   errorMessage?: string;
+  isDemo?: boolean;
+  isTemplate?: boolean;
+  expiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,6 +32,9 @@ const DocumentSchema = new Schema<IDocument>(
       default: 'Processing',
     },
     errorMessage: { type: String },
+    isDemo: { type: Boolean, default: false, index: true },
+    isTemplate: { type: Boolean, default: false, index: true },
+    expiresAt: { type: Date, index: true, expires: 0 },
   },
   {
     timestamps: true,

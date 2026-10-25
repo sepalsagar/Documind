@@ -27,6 +27,10 @@ passages and page numbers behind each answer.
 The app does not currently store uploaded PDF binaries, perform OCR, or provide
 multi-user document sharing.
 
+Try the demo creates a temporary workspace with an original Northstar Labs
+leave and expense policy sample. Demo users can ask 15 questions per hour;
+demo data expires after 24 hours.
+
 ## Run Locally
 
 **Prerequisites:**  Node.js
@@ -40,6 +44,8 @@ multi-user document sharing.
 
 4. Run focused unit tests:
    `npm test`
+5. Seed the demo template in the configured MongoDB database:
+   `npm run seed:demo`
 
 The existing end-to-end QA script is available as `npm run qa` and requires a
 configured `JWT_SECRET`.

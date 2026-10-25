@@ -26,7 +26,7 @@ interface LoginViewProps {
 }
 
 export default function LoginView({ onSwitchToRegister }: LoginViewProps) {
-  const { login, register } = useAuth();
+  const { login, demo } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -53,16 +53,8 @@ export default function LoginView({ onSwitchToRegister }: LoginViewProps) {
   const handleDemoSignIn = async () => {
     setLoading(true);
     setError(null);
-    const demoEmail = 'alex.chen@documind.ai';
-    const demoPass = 'DocuMind2026!';
-    setEmail(demoEmail);
-    setPassword(demoPass);
-
-    // Try login, if not exists, auto register demo
-    const res = await login(demoEmail, demoPass);
-    if (!res.success) {
-      await register('Alex Chen', demoEmail, demoPass);
-    }
+    const res = await demo();
+    if (!res.success) setError(res.error || 'Unable to start the demo.');
     setLoading(false);
   };
 
@@ -211,7 +203,7 @@ export default function LoginView({ onSwitchToRegister }: LoginViewProps) {
               className="w-full py-2.5 px-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-700 flex items-center justify-center space-x-2 transition-colors cursor-pointer"
             >
               <Sparkles className="h-3.5 w-3.5 text-teal-600" />
-              <span>One-Click Demo Sign In</span>
+              <span>Try the demo without signing up</span>
             </button>
           </div>
 

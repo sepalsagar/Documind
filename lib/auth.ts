@@ -17,6 +17,8 @@ export interface TokenPayload {
   userId: string;
   email: string;
   name: string;
+  isDemo?: boolean;
+  expiresAt?: number;
 }
 
 export async function hashPassword(password: string): Promise<string> {

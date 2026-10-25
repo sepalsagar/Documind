@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "qa": "tsx tests/qa.test.ts",
+    "seed:demo": "tsx scripts/seed-demo.ts",
     "clean": "next clean"
   },
   "dependencies": {

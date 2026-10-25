@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createUser, findUserByEmail } from '@/lib/store';
 import { hashPassword, signToken } from '@/lib/auth';
 import { consumeRateLimit } from '@/lib/rate-limit';
+import { getVercelClientIp } from '@/lib/request';
 
 export async function POST(req: NextRequest) {
   try {
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-    const rate = await consumeRateLimit(`auth:register:${ip}`, 5, 15 * 60 * 1000);
+    const ip = getVercelClientIp(req);
+    const rate = await consumeRateLimit(`auth:register:${ip}`, 20, 60 * 60 * 1000);
     if (!rate.allowed) {
       return NextResponse.json({ error: 'Too many registration attempts. Please try again later.' }, {
         status: 429,

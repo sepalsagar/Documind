@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { chunkDocument, cosineSimilarity } from '../lib/rag';
-import { createDocument, getDocumentById } from '../lib/store';
+import { createDemoUser, createDocument, createDocumentChunks, getDocumentById, getDocumentChunks } from '../lib/store';
+import { consumeRateLimit } from '../lib/rate-limit';
 
 describe('RAG primitives', () => {
   it('creates overlapping, page-aware chunks', () => {
@@ -31,5 +32,42 @@ describe('RAG primitives', () => {
     });
     await expect(getDocumentById(document._id, 'different-user')).resolves.toBeNull();
     await expect(getDocumentById(document._id, document.userId)).resolves.toMatchObject({ _id: document._id });
+  });
+
+  it('creates an expiring demo user and clones template chunks with ownership', async () => {
+    const template = await createDocument({
+      userId: '__demo_template__',
+      title: 'Demo policy.pdf',
+      originalName: 'Demo policy.pdf',
+      fileSize: 1,
+      pageCount: 1,
+      status: 'Ready',
+      isTemplate: true,
+    });
+    await createDocumentChunks([{
+      documentId: template._id,
+      chunkIndex: 0,
+      pageNumber: 1,
+      text: 'Employees accrue leave monthly.',
+      embedding: [1, 0],
+      tokenCount: 5,
+      isTemplate: true,
+    }]);
+    const demo = await createDemoUser();
+    expect(demo.isDemo).toBe(true);
+    expect(demo.expiresAt.getTime()).toBeGreaterThan(Date.now());
+    expect(demo.documentId).toBeTruthy();
+    const cloned = await getDocumentById(demo.documentId!, demo.id);
+    expect(cloned?.userId).toBe(demo.id);
+    expect(await getDocumentById(demo.documentId!, 'another-user')).toBeNull();
+    expect((await getDocumentChunks(demo.documentId!))).toHaveLength(1);
+  });
+
+  it('returns a denied result after a rate limit cap', async () => {
+    const key = `test-cap-${Date.now()}`;
+    const first = await consumeRateLimit(key, 1, 60_000);
+    const second = await consumeRateLimit(key, 1, 60_000);
+    expect(first.allowed).toBe(true);
+    expect(second.allowed).toBe(false);
   });
 });

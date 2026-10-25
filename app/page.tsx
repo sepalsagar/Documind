@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { verifyToken } from '@/lib/auth';
+import DemoButton from '@/components/DemoButton';
 
 export const metadata: Metadata = {
   title: 'DocuMind — AI Document Assistant',
@@ -37,6 +38,15 @@ export default async function LandingPage() {
 
   return (
     <main className="min-h-screen overflow-hidden bg-slate-950 text-white">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        name: 'DocuMind',
+        applicationCategory: 'BusinessApplication',
+        operatingSystem: 'Web',
+        description: 'Source-grounded PDF question answering with page-level citations.',
+        url: 'https://documind-zeta-fawn.vercel.app',
+      }) }} />
       <section className="relative isolate">
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,_rgba(20,184,166,0.22),_transparent_38%),radial-gradient(circle_at_20%_20%,_rgba(14,165,233,0.12),_transparent_32%)]" />
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-8">
@@ -66,6 +76,7 @@ export default async function LandingPage() {
                 Start for free <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
               <Link href="/login" className="rounded-xl border border-slate-700 px-5 py-3.5 text-sm font-bold text-white hover:border-slate-500">Sign in</Link>
+              <DemoButton className="inline-flex items-center gap-2 rounded-xl border border-teal-400/40 px-5 py-3.5 text-sm font-bold text-teal-200 hover:bg-teal-400/10" />
             </div>
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-400">
               <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-teal-400" aria-hidden="true" /> Private per-user document access</span>
