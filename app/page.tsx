@@ -128,7 +128,7 @@ export default async function LandingPage() {
       <footer className="border-t border-slate-800 px-6 py-8 lg:px-8">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <span>© {new Date().getFullYear()} DocuMind</span>
-          <div className="flex gap-5"><a href="https://github.com/sepalsagar/Documind" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 hover:text-white"><Github className="h-4 w-4" aria-hidden="true" /> GitHub</a><a href="https://sepalsagar.me" target="_blank" rel="noreferrer" className="hover:text-white">Portfolio</a></div>
+          <div className="flex gap-5"><a href="https://github.com/sepalsagar/Documind" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 hover:text-white"><Github className="h-4 w-4" aria-hidden="true" /> GitHub</a><a href="https://www.sepalsagar.me" target="_blank" rel="noreferrer" className="hover:text-white">Portfolio</a></div>
         </div>
       </footer>
     </main>
