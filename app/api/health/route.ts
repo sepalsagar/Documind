@@ -9,12 +9,16 @@ import { MessageModel } from '@/models/Message';
 export const runtime = 'nodejs';
 
 export async function GET(request: NextRequest) {
-  const rate = await consumeRateLimit(`health:${getVercelClientIp(request)}`, 30, 60_000);
-  if (!rate.allowed) {
-    return NextResponse.json({ error: 'Too many health checks.' }, {
-      status: 429,
-      headers: { 'Retry-After': String(rate.retryAfterSeconds) },
-    });
+  try {
+    const rate = await consumeRateLimit(`health:${getVercelClientIp(request)}`, 30, 60_000);
+    if (!rate.allowed) {
+      return NextResponse.json({ error: 'Too many health checks.' }, {
+        status: 429,
+        headers: { 'Retry-After': String(rate.retryAfterSeconds) },
+      });
+    }
+  } catch (error) {
+    console.error('Health rate limiter unavailable:', error);
   }
 
   const started = Date.now();
