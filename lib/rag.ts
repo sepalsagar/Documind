@@ -32,91 +32,70 @@ export interface RetrievedChunk extends TextChunk {
   similarity: number;
 }
 
+export const PDF_SYNTAX_MARKERS = [
+  /%PDF-\d\.\d/i,
+  /\bobj\s*<</i,
+  /\bendobj\b/i,
+  /\bxref\b/i,
+  /\/Type\s*\/Page\b/i,
+];
+
+export function containsPdfSyntax(text: string): boolean {
+  return PDF_SYNTAX_MARKERS.some((marker) => marker.test(text));
+}
+
+export function isUsableDocumentText(text: string): boolean {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (normalized.length === 0) return false;
+  if (containsPdfSyntax(normalized)) return false;
+
+  const visibleCharacters = normalized.replace(/\s/g, '');
+  const letters = (visibleCharacters.match(/[A-Za-z]/g) || []).length;
+  return letters >= 20 && letters / Math.max(1, visibleCharacters.length) >= 0.2;
+}
+
+export function assertUsableDocumentText(text: string): void {
+  if (!isUsableDocumentText(text)) {
+    throw new Error(
+      'This PDF does not contain readable selectable text. Scanned PDFs need OCR before they can be searched.'
+    );
+  }
+}
+
 /**
  * 1. PDF Text Extraction
  */
 export async function extractTextFromPdf(buffer: Buffer): Promise<ExtractedPdfResult> {
-  try {
-    // Handle both pdf-parse v2 (class PDFParse) and v1 (function)
-    const pdfParseMod: any = await import('pdf-parse');
-    let fullText = '';
-    let pageCount = 1;
-    let extractedPages: ExtractedPage[] = [];
-
-    if (pdfParseMod.PDFParse && typeof pdfParseMod.PDFParse === 'function') {
-      const parser = new pdfParseMod.PDFParse({ data: buffer });
-      const textResult = await parser.getText();
-      fullText = (textResult?.text || '').trim();
-      pageCount = Math.max(1, textResult?.total || 1);
-
-      if (Array.isArray(textResult?.pages) && textResult.pages.length > 0) {
-        extractedPages = textResult.pages
-          .map((p: any, idx: number) => ({
-            pageNumber: p.num || idx + 1,
-            text: (p.text || '').replace(/\s+/g, ' ').trim(),
-          }))
-          .filter((p: ExtractedPage) => p.text.length > 0);
-      }
-    } else {
-      const pdfParse = pdfParseMod.default || pdfParseMod;
-      if (typeof pdfParse === 'function') {
-        const data = await pdfParse(buffer);
-        fullText = (data?.text || '').trim();
-        pageCount = Math.max(1, data?.numpages || 1);
-      }
-    }
-
-    if (fullText.length > 0) {
-      if (extractedPages.length === 0) {
-        const rawPages = fullText.split(/\f|\n\s*\n\s*---\s*Page\s+\d+\s*---\s*\n/gi);
-        if (rawPages.length > 1) {
-          extractedPages = rawPages
-            .map((p: string, idx: number) => ({
-              pageNumber: idx + 1,
-              text: p.replace(/\s+/g, ' ').trim(),
-            }))
-            .filter((p: ExtractedPage) => p.text.length > 0);
-        } else {
-          const charsPerPage = Math.max(1000, Math.ceil(fullText.length / pageCount));
-          for (let i = 0; i < pageCount; i++) {
-            const slice = fullText.slice(i * charsPerPage, (i + 1) * charsPerPage).trim();
-            if (slice.length > 0) {
-              extractedPages.push({
-                pageNumber: i + 1,
-                text: slice.replace(/\s+/g, ' '),
-              });
-            }
-          }
-        }
-      }
-
-      if (extractedPages.length === 0) {
-        extractedPages = [{ pageNumber: 1, text: fullText.replace(/\s+/g, ' ') }];
-      }
-
-      return {
-        fullText: fullText.replace(/\s+/g, ' '),
-        pageCount: Math.max(pageCount, extractedPages.length),
-        pages: extractedPages,
-      };
-    }
-  } catch (err: any) {
-    console.warn('pdf-parse encountered error or non-standard format, using raw string extractor:', err?.message);
+  const pdfParseMod: any = await import('pdf-parse');
+  if (typeof pdfParseMod.PDFParse !== 'function') {
+    throw new Error('The PDF text parser is unavailable in this runtime.');
   }
 
-  // Fallback text extraction from raw buffer
-  const rawString = buffer.toString('utf-8');
-  const cleaned = rawString.replace(/[^\x20-\x7E\n\r\t]/g, ' ').replace(/\s+/g, ' ').trim();
+  const parser = new pdfParseMod.PDFParse({ data: buffer });
+  const textResult = await parser.getText();
+  const fullText = (textResult?.text || '').replace(/\s+/g, ' ').trim();
+  const pageCount = Math.max(1, textResult?.total || 1);
+  const pages = Array.isArray(textResult?.pages)
+    ? textResult.pages
+        .map((page: any, index: number) => ({
+          pageNumber: page.num || index + 1,
+          text: (page.text || '').replace(/\s+/g, ' ').trim(),
+        }))
+        .filter((page: ExtractedPage) => page.text.length > 0)
+    : [];
 
-  if (cleaned.length > 20) {
-    return {
-      fullText: cleaned,
-      pageCount: 1,
-      pages: [{ pageNumber: 1, text: cleaned }],
-    };
+  assertUsableDocumentText(fullText);
+  if (pages.length === 0) {
+    throw new Error(
+      'This PDF did not expose readable page text. Scanned PDFs need OCR before they can be searched.'
+    );
   }
 
-  throw new Error('Unable to extract text from the provided PDF file. Please ensure the PDF is not password protected or purely scanned images without OCR.');
+  return {
+    fullText,
+    pageCount: Math.max(pageCount, pages.length),
+    pages,
+  };
 }
 
 /**

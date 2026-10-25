@@ -1,9 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { chunkDocument, cosineSimilarity } from '../lib/rag';
+import { chunkDocument, cosineSimilarity, extractTextFromPdf, isUsableDocumentText } from '../lib/rag';
+import { readFileSync } from 'node:fs';
 import { createDemoUser, createDocument, createDocumentChunks, getDocumentById, getDocumentChunks } from '../lib/store';
 import { consumeRateLimit } from '../lib/rate-limit';
 
 describe('RAG primitives', () => {
+  it('extracts readable fixture text with page numbers', async () => {
+    const extraction = await extractTextFromPdf(readFileSync('scripts/demo-policy.pdf'));
+    expect(extraction.pageCount).toBe(4);
+    expect(extraction.pages.map((page) => page.pageNumber)).toEqual([1, 2, 3, 4]);
+    expect(extraction.fullText).toContain('Northstar Labs');
+  });
+
+  it('rejects empty and raw PDF syntax as document text', () => {
+    expect(isUsableDocumentText('')).toBe(false);
+    expect(isUsableDocumentText('%PDF-1.4 1 0 obj << /Type /Page >> endobj xref')).toBe(false);
+    expect(isUsableDocumentText('Employees submit itemized receipts within thirty days.')).toBe(true);
+  });
+
   it('creates overlapping, page-aware chunks', () => {
     const chunks = chunkDocument(
       [{ pageNumber: 2, text: Array.from({ length: 10 }, (_, i) => `word${i}`).join(' ') }],

@@ -4,6 +4,8 @@ import { createDocument, createDocumentChunks, updateDocument } from '@/lib/stor
 import { extractTextFromPdf, chunkDocument, generateEmbedding } from '@/lib/rag';
 import { consumeRateLimit } from '@/lib/rate-limit';
 
+export const runtime = 'nodejs';
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_PAGE_COUNT = 100;
 
@@ -60,9 +62,6 @@ export async function POST(req: NextRequest) {
       // 1. PDF Text Extraction
       const extraction = await extractTextFromPdf(buffer);
 
-      if (!extraction.fullText || extraction.fullText.trim().length === 0) {
-        throw new Error('This PDF does not contain selectable text. Scanned PDFs need OCR before they can be searched.');
-      }
       if (extraction.pageCount > MAX_PAGE_COUNT) {
         throw new Error(`This PDF has more than ${MAX_PAGE_COUNT} pages. Please upload a shorter document.`);
       }

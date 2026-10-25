@@ -88,6 +88,17 @@ export default function DashboardView({
     setRefreshCount((c) => c + 1);
   };
 
+  const flagForReupload = async (doc: DocumentItem) => {
+    const response = await fetch(`/api/documents/${doc._id}/reprocess`, { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok) {
+      setLoadError(data.error || 'We could not inspect this document.');
+      return;
+    }
+    setLoadError(data.message || 'The document was flagged for re-upload.');
+    handleRefresh();
+  };
+
   // Filtered documents
   const filteredDocuments = documents.filter((doc) => {
     const matchesSearch =
@@ -372,6 +383,16 @@ export default function DashboardView({
                       {/* Actions */}
                       <td className="py-4 px-6 text-right whitespace-nowrap">
                         <div className="inline-flex items-center space-x-1.5">
+                          {doc.status === 'Ready' && (
+                            <button
+                              id={`reprocess_doc_btn_${doc._id}`}
+                              onClick={() => flagForReupload(doc)}
+                              title="Check for raw PDF extraction and flag for re-upload"
+                              className="p-1.5 text-slate-400 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                            </button>
+                          )}
                           <button
                             id={`open_workspace_btn_${doc._id}`}
                             onClick={() => onOpenWorkspace(doc)}

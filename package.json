@@ -10,6 +10,7 @@
     "test": "vitest run",
     "qa": "tsx tests/qa.test.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
+    "flag:raw-pdf": "tsx scripts/flag-raw-pdf-documents.ts",
     "screenshots": "node scripts/capture-screenshots.mjs",
     "clean": "next clean"
   },
