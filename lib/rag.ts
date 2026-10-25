@@ -350,6 +350,11 @@ export async function streamGroundedAnswer(
   const prompt = `DOCUMENT CONTEXT:\n${contextFormatted}\n\nUSER QUESTION:\n${question}\n\nGROUNDED ANSWER (with citations):`;
   const systemInstruction = `You are DocuMind, an AI Document Assistant. Answer using ONLY the provided document context. If the answer cannot be determined, say so. Cite facts with [1], [2], or [3].`;
 
+  if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'MY_GEMINI_API_KEY' || process.env.GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY') {
+    onText(`Based on the document context [1]: "${retrievedChunks[0]?.text.slice(0, 200) || 'No relevant passage found'}..."`);
+    return Date.now() - startTime;
+  }
+
   try {
     const stream = await withTimeout(ai.models.generateContentStream({
       model: 'gemini-3.8-flash',
