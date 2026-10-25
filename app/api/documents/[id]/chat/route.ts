@@ -1,0 +1,101 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getUserFromRequest } from '@/lib/auth';
+import { getDocumentById, getDocumentChunks } from '@/lib/store';
+import { generateEmbedding, retrieveTopK, generateGroundedAnswer } from '@/lib/rag';
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const authUser = getUserFromRequest(req);
+    if (!authUser) {
+      return NextResponse.json({ error: 'Unauthorized. Please sign in.' }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const doc = await getDocumentById(id, authUser.userId);
+
+    if (!doc) {
+      return NextResponse.json({ error: 'Document not found or access denied.' }, { status: 404 });
+    }
+
+    if (doc.status !== 'Ready') {
+      return NextResponse.json(
+        { error: `Document is currently ${doc.status}. Please wait until indexing completes.` },
+        { status: 400 }
+      );
+    }
+
+    const body = await req.json();
+    const { question, topK = 3 } = body;
+
+    if (!question || typeof question !== 'string' || question.trim().length === 0) {
+      return NextResponse.json({ error: 'Please provide a valid question.' }, { status: 400 });
+    }
+
+    // Question length sanity check
+    if (question.length > 2000) {
+      return NextResponse.json({ error: 'Question is too long (max 2000 characters).' }, { status: 400 });
+    }
+
+    // 1. Fetch document chunks
+    const chunks = await getDocumentChunks(id);
+    if (chunks.length === 0) {
+      return NextResponse.json(
+        { error: 'No vector chunks found for this document.' },
+        { status: 404 }
+      );
+    }
+
+    // 2. Generate embedding for query
+    const queryEmbedding = await generateEmbedding(question.trim());
+
+    // 3. Perform Cosine Similarity Semantic Retrieval
+    const k = Math.min(Math.max(1, topK), 5);
+    const retrievedChunks = retrieveTopK(queryEmbedding, chunks, k);
+
+    // A top-K list always has a "best" entry, even when it is unrelated. Do
+    // not turn that implementation detail into an apparently grounded answer.
+    const hasSufficientEvidence = retrievedChunks.length > 0 && retrievedChunks[0].similarity >= 0.12;
+    if (!hasSufficientEvidence) {
+      return NextResponse.json({
+        question: question.trim(),
+        answer: 'The document does not contain enough relevant information to answer this question confidently.',
+        sources: [],
+        latencyMs: 0,
+        documentId: id,
+        documentTitle: doc.title,
+      });
+    }
+
+    // 4. Grounded AI Generation with Gemini
+    const { answer, latencyMs } = await generateGroundedAnswer(question.trim(), retrievedChunks);
+
+    // Format sources with actual chunks
+    const sources = retrievedChunks.map((c, index) => ({
+      sourceId: index + 1,
+      chunkIndex: c.chunkIndex,
+      pageNumber: c.pageNumber,
+      text: c.text,
+      tokenCount: c.tokenCount,
+      similarityScore: Math.round(c.similarity * 100),
+      similarity: c.similarity,
+    }));
+
+    return NextResponse.json({
+      question: question.trim(),
+      answer,
+      sources,
+      latencyMs,
+      documentId: id,
+      documentTitle: doc.title,
+    });
+  } catch (error: any) {
+    console.error('RAG Chat route error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Internal server error during RAG query.' },
+      { status: 500 }
+    );
+  }
+}
