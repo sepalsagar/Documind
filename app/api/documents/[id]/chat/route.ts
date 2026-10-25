@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
 import { getDocumentById, getDocumentChunks } from '@/lib/store';
-import { generateEmbedding, retrieveTopK, generateGroundedAnswer } from '@/lib/rag';
+import { generateEmbedding, retrieveTopK, streamGroundedAnswer } from '@/lib/rag';
 import { consumeRateLimit } from '@/lib/rate-limit';
+
+export const runtime = 'nodejs';
 
 export async function POST(
   req: NextRequest,
@@ -94,8 +96,6 @@ export async function POST(
     }
 
     // 4. Grounded AI Generation with Gemini
-    const { answer, latencyMs } = await generateGroundedAnswer(question.trim(), retrievedChunks);
-
     // Format sources with actual chunks
     const sources = retrievedChunks.map((c, index) => ({
       sourceId: index + 1,
@@ -107,13 +107,36 @@ export async function POST(
       similarity: c.similarity,
     }));
 
-    return NextResponse.json({
-      question: question.trim(),
-      answer,
-      sources,
-      latencyMs,
-      documentId: id,
-      documentTitle: doc.title,
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (payload: Record<string, unknown>) => {
+          controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
+        };
+        send({ type: 'stage', stage: 'Generating grounded answer…' });
+        let answer = '';
+        const latencyMs = await streamGroundedAnswer(question.trim(), retrievedChunks, (text) => {
+          answer += text;
+          send({ type: 'text', text });
+        });
+        send({
+          type: 'complete',
+          question: question.trim(),
+          answer,
+          sources,
+          latencyMs,
+          documentId: id,
+          documentTitle: doc.title,
+        });
+        controller.close();
+      },
+    });
+
+    return new NextResponse(stream, {
+      headers: {
+        'Content-Type': 'application/x-ndjson; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+      },
     });
   } catch (error: any) {
     console.error('RAG Chat route error:', error);

@@ -10,6 +10,18 @@ const ai = new GoogleGenAI({
   },
 });
 
+const EMBEDDING_TIMEOUT_MS = 15_000;
+const ANSWER_TIMEOUT_MS = 30_000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error(message)), timeoutMs);
+    }),
+  ]);
+}
+
 export interface ExtractedPage {
   pageNumber: number;
   text: string;
@@ -139,28 +151,35 @@ export function chunkDocument(
  * 3. Embedding Generation via Gemini / Semantic Vector Model
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
+  const [embedding] = await generateEmbeddings([text]);
+  return embedding;
+}
+
+export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (apiKey && apiKey !== 'MY_GEMINI_API_KEY' && apiKey !== 'YOUR_GEMINI_API_KEY') {
     try {
-      const response: any = await ai.models.embedContent({
+      const response: any = await withTimeout(ai.models.embedContent({
         model: 'gemini-embedding-2-preview',
-        contents: text,
-      });
+        contents: texts,
+      }), EMBEDDING_TIMEOUT_MS, 'Embedding request timed out.');
 
-      if (response.embedding?.values && response.embedding.values.length > 0) {
-        return response.embedding.values;
+      const values = response.embeddings
+        ?.map((embedding: any) => embedding?.values)
+        .filter((embedding: any) => Array.isArray(embedding) && embedding.length > 0);
+      if (values?.length === texts.length) {
+        return values;
       }
-      if (response.embeddings?.[0]?.values && response.embeddings[0].values.length > 0) {
-        return response.embeddings[0].values;
+      if (texts.length === 1 && response.embedding?.values?.length > 0) {
+        return [response.embedding.values];
       }
     } catch (err: any) {
       console.warn('Gemini embedding API fallback to semantic vector:', err?.message);
     }
   }
 
-  // Deterministic 128-dimensional semantic embedding generator
-  return computeDeterministicVector(text, 128);
+  return texts.map((text) => computeDeterministicVector(text, 128));
 }
 
 /**
@@ -283,14 +302,14 @@ ${question}
 GROUNDED ANSWER (with citations):`;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await withTimeout(ai.models.generateContent({
       model: 'gemini-3.8-flash',
       contents: prompt,
       config: {
         systemInstruction,
         temperature: 0.1, // low temperature for deterministic factuality
       },
-    });
+    }), ANSWER_TIMEOUT_MS, 'Answer generation timed out.');
 
     // Keep citation identifiers in the answer within the deterministic source
     // list returned by the route.  A model-generated [4] cannot point to a
@@ -323,4 +342,32 @@ GROUNDED ANSWER (with citations):`;
       latencyMs,
     };
   }
+}
+
+export async function streamGroundedAnswer(
+  question: string,
+  retrievedChunks: RetrievedChunk[],
+  onText: (text: string) => void
+): Promise<number> {
+  const startTime = Date.now();
+  const contextFormatted = retrievedChunks
+    .map((c, idx) => `[Source ${idx + 1}] (Page ${c.pageNumber}, Chunk #${c.chunkIndex + 1}):\n${c.text}`)
+    .join('\n\n');
+  const prompt = `DOCUMENT CONTEXT:\n${contextFormatted}\n\nUSER QUESTION:\n${question}\n\nGROUNDED ANSWER (with citations):`;
+  const systemInstruction = `You are DocuMind, an AI Document Assistant. Answer using ONLY the provided document context. If the answer cannot be determined, say so. Cite facts with [1], [2], or [3].`;
+
+  try {
+    const stream = await withTimeout(ai.models.generateContentStream({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+      config: { systemInstruction, temperature: 0.1 },
+    }), ANSWER_TIMEOUT_MS, 'Answer generation timed out.');
+    for await (const response of stream) {
+      if (response.text) onText(response.text);
+    }
+  } catch (error: any) {
+    console.warn('Gemini streaming failed, using contextual fallback:', error?.message);
+    onText(`Based on the document context [1]: "${retrievedChunks[0]?.text.slice(0, 200) || 'No relevant passage found'}..."`);
+  }
+  return Date.now() - startTime;
 }

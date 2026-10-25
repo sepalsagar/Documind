@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
 import { createDocument, createDocumentChunks, updateDocument } from '@/lib/store';
-import { extractTextFromPdf, chunkDocument, generateEmbedding } from '@/lib/rag';
+import { extractTextFromPdf, chunkDocument, generateEmbeddings } from '@/lib/rag';
 import { consumeRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -73,18 +73,15 @@ export async function POST(req: NextRequest) {
       }
 
       // 3. Embedding Generation
-      const chunksData = [];
-      for (const c of chunks) {
-        const emb = await generateEmbedding(c.text);
-        chunksData.push({
+      const embeddings = await generateEmbeddings(chunks.map((chunk) => chunk.text));
+      const chunksData = chunks.map((c, index) => ({
           documentId: doc._id,
           chunkIndex: c.chunkIndex,
           pageNumber: c.pageNumber,
           text: c.text,
-          embedding: emb,
+          embedding: embeddings[index],
           tokenCount: c.tokenCount,
-        });
-      }
+      }));
 
       // 4. Save Chunks
       await createDocumentChunks(chunksData);

@@ -150,15 +150,32 @@ export default function WorkspaceView({
         }),
       });
 
-      setQueryStage('Retrieving relevant passages…');
-
-      const data = await res.json();
-
       if (!res.ok) {
+        const data = await res.json();
         throw new Error(data.error || 'Failed to generate answer.');
       }
 
-      setQueryStage('Generating grounded answer…');
+      if (!res.body) throw new Error('The answer stream was unavailable.');
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let data: any = null;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line);
+          if (event.type === 'stage') setQueryStage(event.stage);
+          if (event.type === 'text') setQueryStage('Generating grounded answer…');
+          if (event.type === 'complete') data = event;
+        }
+      }
+      if (!data) throw new Error('The answer stream ended before completion.');
+
       const assistantMsg: ChatMessage = {
         id: `assistant_${Date.now()}`,
         sender: 'assistant',
