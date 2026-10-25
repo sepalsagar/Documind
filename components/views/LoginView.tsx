@@ -115,7 +115,7 @@ export default function LoginView({ onSwitchToRegister }: LoginViewProps) {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="alex.chen@documind.ai"
+                  placeholder="you@example.com"
                   className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-sm text-slate-900 placeholder:text-slate-400 focus:border-teal-500 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 transition-all"
                 />
               </div>
@@ -244,10 +244,10 @@ export default function LoginView({ onSwitchToRegister }: LoginViewProps) {
                   </div>
                   <div>
                     <div className="text-xs font-semibold text-slate-200">
-                      Attention_Is_All_You_Need.pdf
+                      Northstar_Leave_Expense_Policy.pdf
                     </div>
                     <div className="text-[11px] font-mono text-slate-400">
-                      15 pages • 2.84 MB • 6 vector chunks
+                      4 pages • 42 KB • 4 vector chunks
                     </div>
                   </div>
                 </div>
@@ -263,7 +263,7 @@ export default function LoginView({ onSwitchToRegister }: LoginViewProps) {
                   <span className="text-slate-300 font-medium">User Prompt:</span>
                 </div>
                 <div className="text-sm font-medium text-slate-100 pl-5 border-l-2 border-teal-500">
-                  &ldquo;What is the formula used for Scaled Dot-Product Attention?&rdquo;
+                  &ldquo;How many paid leave days accrue each month?&rdquo;
                 </div>
               </div>
 
@@ -279,10 +279,9 @@ export default function LoginView({ onSwitchToRegister }: LoginViewProps) {
                   </span>
                 </div>
                 <p className="text-xs text-slate-200 leading-relaxed">
-                  Scaled Dot-Product Attention is computed on a set of queries packed into matrix Q,
-                  with keys K and values V packed into matrices as{' '}
+                  Employees accrue paid leave each month, subject to the policy terms in the document{' '}
                   <span className="font-mono bg-teal-950 px-1.5 py-0.5 rounded text-teal-300 border border-teal-800/60">
-                    Attention(Q, K, V) = softmax(QK^T / √d_k)V
+                    [1] Page 2
                   </span>{' '}
                   <span className="text-teal-400 font-bold">[1]</span>.
                 </p>
