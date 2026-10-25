@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { chunkDocument, cosineSimilarity, extractTextFromPdf, isUsableDocumentText } from '../lib/rag';
 import { readFileSync } from 'node:fs';
-import { createDemoUser, createDocument, createDocumentChunks, getDocumentById, getDocumentChunks } from '../lib/store';
+import { createDemoUser, createDocument, createDocumentChunks, getDocumentById, getDocumentChunks, getOrCreateConversation, createConversationMessage, getConversationMessages } from '../lib/store';
 import { consumeRateLimit } from '../lib/rate-limit';
 
 describe('RAG primitives', () => {
@@ -83,5 +83,34 @@ describe('RAG primitives', () => {
     const second = await consumeRateLimit(key, 1, 60_000);
     expect(first.allowed).toBe(true);
     expect(second.allowed).toBe(false);
+  });
+
+  it('persists conversation messages and enforces conversation ownership', async () => {
+    const owner = `history-owner-${Date.now()}`;
+    const document = await createDocument({
+      userId: owner,
+      title: 'History.pdf',
+      originalName: 'History.pdf',
+      fileSize: 10,
+      status: 'Ready',
+    });
+    const conversation = await getOrCreateConversation(owner, document._id);
+    await createConversationMessage({
+      conversationId: conversation._id,
+      userId: owner,
+      documentId: document._id,
+      role: 'user',
+      content: 'What is on page one?',
+    });
+    await createConversationMessage({
+      conversationId: conversation._id,
+      userId: owner,
+      documentId: document._id,
+      role: 'assistant',
+      content: 'The answer is on page one.',
+      sources: [{ page: 1, chunkId: '0', score: 0.9 }],
+    });
+    await expect(getConversationMessages(conversation._id, owner, document._id)).resolves.toHaveLength(2);
+    await expect(getConversationMessages(conversation._id, 'other-user', document._id)).resolves.toHaveLength(0);
   });
 });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
-import { getDocumentById, getDocumentChunks } from '@/lib/store';
+import { getDocumentById, getDocumentChunks, getOrCreateConversation, createConversationMessage } from '@/lib/store';
 import { generateEmbedding, retrieveTopK, streamGroundedAnswer } from '@/lib/rag';
 import { consumeRateLimit } from '@/lib/rate-limit';
 
@@ -85,6 +85,10 @@ export async function POST(
     // not turn that implementation detail into an apparently grounded answer.
     const hasSufficientEvidence = retrievedChunks.length > 0 && retrievedChunks[0].similarity >= 0.12;
     if (!hasSufficientEvidence) {
+      const expiresAt = authUser.isDemo && authUser.expiresAt ? new Date(authUser.expiresAt) : undefined;
+      const conversation = await getOrCreateConversation(authUser.userId, id, expiresAt);
+      await createConversationMessage({ conversationId: conversation._id, userId: authUser.userId, documentId: id, role: 'user', content: question.trim(), expiresAt });
+      await createConversationMessage({ conversationId: conversation._id, userId: authUser.userId, documentId: id, role: 'assistant', content: 'The document does not contain enough relevant information to answer this question confidently.', expiresAt });
       return NextResponse.json({
         question: question.trim(),
         answer: 'The document does not contain enough relevant information to answer this question confidently.',
@@ -106,6 +110,16 @@ export async function POST(
       similarityScore: Math.round(c.similarity * 100),
       similarity: c.similarity,
     }));
+    const expiresAt = authUser.isDemo && authUser.expiresAt ? new Date(authUser.expiresAt) : undefined;
+    const conversation = await getOrCreateConversation(authUser.userId, id, expiresAt);
+    await createConversationMessage({
+      conversationId: conversation._id,
+      userId: authUser.userId,
+      documentId: id,
+      role: 'user',
+      content: question.trim(),
+      expiresAt,
+    });
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
@@ -127,6 +141,15 @@ export async function POST(
           latencyMs,
           documentId: id,
           documentTitle: doc.title,
+        });
+        await createConversationMessage({
+          conversationId: conversation._id,
+          userId: authUser.userId,
+          documentId: id,
+          role: 'assistant',
+          content: answer,
+          sources: sources.map((source) => ({ page: source.pageNumber, chunkId: String(source.chunkIndex), score: source.similarity })),
+          expiresAt,
         });
         controller.close();
       },

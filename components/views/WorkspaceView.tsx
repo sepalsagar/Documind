@@ -76,6 +76,7 @@ export default function WorkspaceView({
   const [copiedSourceId, setCopiedSourceId] = useState<number | null>(null);
   const [chunksMetadata, setChunksMetadata] = useState<any[]>([]);
   const [showMobileSources, setShowMobileSources] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -105,16 +106,51 @@ export default function WorkspaceView({
     loadChunks();
   }, [doc._id, token]);
 
-  // Initial welcome message
+  // Load persisted conversation history, falling back to a welcome message.
   useEffect(() => {
-    setMessages([
-      {
-        id: 'initial_welcome',
-        sender: 'assistant',
-        text: `I have indexed **${doc.title}** (${doc.chunkCount || 6} vector chunks across ${doc.pageCount || 1} pages).\n\nYou can ask any question about the contents of this PDF. All answers will be strictly grounded in the document context with exact source citations.`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      },
-    ]);
+    let ignore = false;
+    async function loadConversation() {
+      try {
+        const response = await fetch(`/api/documents/${doc._id}/conversation`);
+        if (!response.ok) throw new Error('Unable to load history');
+        const data = await response.json();
+        if (ignore) return;
+        setConversationId(data.conversationId);
+        if (data.messages?.length) {
+          setMessages(data.messages.map((message: any) => ({
+            id: message._id,
+            sender: message.role,
+            text: message.content,
+            sources: (message.sources || []).map((source: any, index: number) => ({
+              sourceId: index + 1,
+              chunkIndex: Number(source.chunkId),
+              pageNumber: source.page,
+              text: '',
+              tokenCount: 0,
+              similarityScore: Math.round(source.score * 100),
+              similarity: source.score,
+            })),
+            timestamp: new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          })));
+        } else {
+          setMessages([{
+            id: 'initial_welcome',
+            sender: 'assistant',
+            text: `I have indexed **${doc.title}** (${doc.chunkCount || 6} vector chunks across ${doc.pageCount || 1} pages).\n\nYou can ask questions about this PDF and review the page citations in each answer.`,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          }]);
+        }
+      } catch {
+        if (!ignore) setMessages([{
+          id: 'initial_welcome',
+          sender: 'assistant',
+          text: `I have indexed **${doc.title}**. You can ask questions about this PDF.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        }]);
+      }
+    }
+    loadConversation();
+    return () => { ignore = true; };
   }, [doc]);
 
   useEffect(() => {
@@ -204,6 +240,19 @@ export default function WorkspaceView({
       setLoading(false);
       setQueryStage('');
     }
+  };
+
+  const handleNewChat = async () => {
+    await fetch(`/api/documents/${doc._id}/conversation`, { method: 'DELETE' });
+    setConversationId(null);
+    setRetrievedSources([]);
+    setActiveSourceId(null);
+    setMessages([{
+      id: `welcome_${Date.now()}`,
+      sender: 'assistant',
+      text: `New chat started for **${doc.title}**. Ask a question whenever you are ready.`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    }]);
   };
 
   const copyToClipboard = (text: string, id: string, isSource = false) => {
@@ -296,6 +345,15 @@ export default function WorkspaceView({
             className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
           >
             <Edit3 className="h-4 w-4" />
+          </button>
+
+          <button
+            id="workspace_new_chat_btn"
+            onClick={handleNewChat}
+            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-teal-700 hover:bg-teal-50 border border-slate-200 transition-colors cursor-pointer"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>New chat</span>
           </button>
 
           <button

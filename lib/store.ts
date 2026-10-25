@@ -2,6 +2,8 @@ import { connectToDatabase } from './db';
 import { UserModel, IUser } from '../models/User';
 import { DocumentModel, IDocument, DocumentStatus } from '../models/Document';
 import { DocumentChunkModel, IDocumentChunk } from '../models/DocumentChunk';
+import { ConversationModel } from '../models/Conversation';
+import { IMessageSource, MessageModel, MessageRole } from '../models/Message';
 
 // In-Memory fallback store
 export interface MemoryUser {
@@ -50,7 +52,31 @@ declare global {
     users: Map<string, MemoryUser>;
     documents: Map<string, MemoryDocument>;
     chunks: Map<string, MemoryDocumentChunk>;
+    conversations: Map<string, MemoryConversation>;
+    messages: Map<string, MemoryMessage>;
   } | undefined;
+}
+
+export interface MemoryConversation {
+  _id: string;
+  userId: string;
+  documentId: string;
+  title: string;
+  createdAt: Date;
+  updatedAt: Date;
+  expiresAt?: Date;
+}
+
+export interface MemoryMessage {
+  _id: string;
+  conversationId: string;
+  userId: string;
+  documentId: string;
+  role: MessageRole;
+  content: string;
+  sources: IMessageSource[];
+  createdAt: Date;
+  expiresAt?: Date;
 }
 
 if (!global.documindStore) {
@@ -58,6 +84,8 @@ if (!global.documindStore) {
     users: new Map(),
     documents: new Map(),
     chunks: new Map(),
+    conversations: new Map(),
+    messages: new Map(),
   };
 }
 
@@ -482,6 +510,9 @@ export async function deleteDocument(id: string, userId: string): Promise<boolea
       const res = await DocumentModel.deleteOne({ _id: id, userId });
       if (res.deletedCount > 0) {
         await DocumentChunkModel.deleteMany({ documentId: id });
+        const conversations = await ConversationModel.find({ documentId: id, userId }).select('_id').lean();
+        await MessageModel.deleteMany({ documentId: id, userId });
+        await ConversationModel.deleteMany({ documentId: id, userId });
         return true;
       }
     } catch (e) {
@@ -498,10 +529,125 @@ export async function deleteDocument(id: string, userId: string): Promise<boolea
         memoryStore.chunks.delete(chunkId);
       }
     }
+    for (const [conversationId, conversation] of memoryStore.conversations.entries()) {
+      if (conversation.documentId === id && conversation.userId === userId) {
+        memoryStore.conversations.delete(conversationId);
+        for (const [messageId, message] of memoryStore.messages.entries()) {
+          if (message.conversationId === conversationId) memoryStore.messages.delete(messageId);
+        }
+      }
+    }
     return true;
   }
+
   return false;
 }
+
+  export async function getOrCreateConversation(
+    userId: string,
+    documentId: string,
+    expiresAt?: Date
+  ): Promise<MemoryConversation> {
+    const db = await connectToDatabase();
+    if (db) {
+      try {
+        const existing = await ConversationModel.findOne({ userId, documentId }).sort({ updatedAt: -1 }).lean();
+        if (existing) return { ...existing, _id: existing._id.toString() } as MemoryConversation;
+        const created = await ConversationModel.create({ userId, documentId, expiresAt });
+        return {
+          _id: created._id.toString(),
+          userId: created.userId,
+          documentId: created.documentId,
+          title: created.title,
+          createdAt: created.createdAt,
+          updatedAt: created.updatedAt,
+          expiresAt: created.expiresAt,
+        };
+      } catch (error) {
+        console.warn('Conversation persistence unavailable, using local store:', error);
+      }
+    }
+    const existing = Array.from(memoryStore.conversations.values())
+      .filter((conversation) => conversation.userId === userId && conversation.documentId === documentId)
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0];
+    if (existing) return existing;
+    const now = new Date();
+    const conversation = { _id: generateId(), userId, documentId, title: 'New chat', createdAt: now, updatedAt: now, expiresAt };
+    memoryStore.conversations.set(conversation._id, conversation);
+    return conversation;
+  }
+
+  export async function getConversationMessages(
+    conversationId: string,
+    userId: string,
+    documentId: string
+  ): Promise<MemoryMessage[]> {
+    const db = await connectToDatabase();
+    if (db) {
+      try {
+        const conversation = await ConversationModel.findOne({ _id: conversationId, userId, documentId }).lean();
+        if (!conversation) return [];
+        const messages = await MessageModel.find({ conversationId, userId, documentId }).sort({ createdAt: 1 }).lean();
+        return messages.map((message: any) => ({ ...message, _id: message._id.toString() }));
+      } catch (error) {
+        console.warn('Message history unavailable, using local store:', error);
+      }
+    }
+    const conversation = memoryStore.conversations.get(conversationId);
+    if (!conversation || conversation.userId !== userId || conversation.documentId !== documentId) return [];
+    return Array.from(memoryStore.messages.values())
+      .filter((message) => message.conversationId === conversationId && message.userId === userId && message.documentId === documentId)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  export async function createConversationMessage(data: {
+    conversationId: string;
+    userId: string;
+    documentId: string;
+    role: MessageRole;
+    content: string;
+    sources?: IMessageSource[];
+    expiresAt?: Date;
+  }): Promise<MemoryMessage> {
+    const db = await connectToDatabase();
+    if (db) {
+      try {
+        const message = await MessageModel.create({ ...data, sources: data.sources || [] });
+        await ConversationModel.updateOne({ _id: data.conversationId, userId: data.userId, documentId: data.documentId }, { $set: { updatedAt: new Date() } });
+        return { ...message.toObject(), _id: message._id.toString() } as MemoryMessage;
+      } catch (error) {
+        console.warn('Message persistence unavailable, using local store:', error);
+      }
+    }
+    const message: MemoryMessage = { _id: generateId(), ...data, sources: data.sources || [], createdAt: new Date() };
+    memoryStore.messages.set(message._id, message);
+    const conversation = memoryStore.conversations.get(data.conversationId);
+    if (conversation) conversation.updatedAt = new Date();
+    return message;
+  }
+
+  export async function clearConversation(conversationId: string, userId: string, documentId: string): Promise<boolean> {
+    const db = await connectToDatabase();
+    if (db) {
+      try {
+        const conversation = await ConversationModel.findOne({ _id: conversationId, userId, documentId });
+        if (!conversation) return false;
+        await MessageModel.deleteMany({ conversationId, userId, documentId });
+        conversation.updatedAt = new Date();
+        await conversation.save();
+        return true;
+      } catch (error) {
+        console.warn('Conversation clear unavailable, using local store:', error);
+      }
+    }
+    const conversation = memoryStore.conversations.get(conversationId);
+    if (!conversation || conversation.userId !== userId || conversation.documentId !== documentId) return false;
+    for (const [messageId, message] of memoryStore.messages.entries()) {
+      if (message.conversationId === conversationId) memoryStore.messages.delete(messageId);
+    }
+    conversation.updatedAt = new Date();
+    return true;
+  }
 
 // Chunk Operations
 export async function createDocumentChunks(
