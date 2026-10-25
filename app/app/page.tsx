@@ -15,7 +15,7 @@ import DeleteModal from '@/components/DeleteModal';
 import { Loader2 } from 'lucide-react';
 
 function AppContent() {
-  const { user, loading } = useAuth();
+  const { user, loading, authError, retryAuth } = useAuth();
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [currentView, setCurrentView] = useState<NavView>('dashboard');
 
@@ -36,6 +36,18 @@ function AppContent() {
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#f8fafc] text-slate-700 space-y-3">
         <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
         <span className="text-xs font-mono font-medium">Initializing DocuMind...</span>
+      </div>
+    );
+  }
+
+  if (authError) {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#f8fafc] text-slate-700 space-y-3">
+        <p className="text-sm font-medium">We could not verify your session.</p>
+        <p className="text-xs text-slate-500">Check your connection and try again.</p>
+        <button onClick={retryAuth} className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700">
+          Retry
+        </button>
       </div>
     );
   }

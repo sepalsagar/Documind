@@ -13,6 +13,8 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   loading: boolean;
+  authError: boolean;
+  retryAuth: () => void;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (name: string, email: string, password: string, confirmPassword?: string) => Promise<{ success: boolean; error?: string }>;
   demo: () => Promise<{ success: boolean; error?: string }>;
@@ -26,30 +28,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState(false);
 
-  // Initialize session on mount
-  useEffect(() => {
-    async function checkAuth() {
-      try {
-        const res = await fetch('/api/auth/me');
+  const checkAuth = async () => {
+    setLoading(true);
+    setAuthError(false);
+    try {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 8000);
+      const res = await fetch('/api/auth/me', { signal: controller.signal });
+      window.clearTimeout(timeout);
 
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data.user);
-        } else {
-          // Token expired or invalid
-          setToken(null);
-          setUser(null);
-        }
-      } catch (err) {
-        console.error('Auth verification error:', err);
-      } finally {
-        setLoading(false);
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data.user);
+      } else {
+        setToken(null);
+        setUser(null);
       }
+    } catch (err) {
+      console.error('Auth verification error:', err);
+      setAuthError(true);
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     checkAuth();
   }, []);
+
+  const retryAuth = () => {
+    void checkAuth();
+  };
 
   const login = async (email: string, password: string) => {
     try {
@@ -126,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, demo, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, token, loading, authError, retryAuth, login, register, demo, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

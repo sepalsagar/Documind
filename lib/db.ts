@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 const MONGODB_URI = process.env.MONGODB_URI;
+const isProduction = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
 
 interface MongooseCache {
   conn: typeof mongoose | null;
@@ -20,6 +21,9 @@ if (!cached) {
 
 export async function connectToDatabase(): Promise<typeof mongoose | null> {
   if (!MONGODB_URI) {
+    if (isProduction) {
+      throw new Error('MONGODB_URI is required in production.');
+    }
     return null;
   }
 
@@ -29,13 +33,16 @@ export async function connectToDatabase(): Promise<typeof mongoose | null> {
 
   // If connection failed recently (within 30s), avoid blocking requests with timeouts
   if (Date.now() - cached!.lastFailedAt < 30000) {
+    if (isProduction) {
+      throw new Error('MongoDB is temporarily unavailable.');
+    }
     return null;
   }
 
   if (!cached!.promise) {
     const opts = {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 1500,
+      serverSelectionTimeoutMS: 5000,
     };
 
     cached!.promise = mongoose
@@ -44,9 +51,10 @@ export async function connectToDatabase(): Promise<typeof mongoose | null> {
         return m;
       })
       .catch((err) => {
-        console.warn('MongoDB connection unavailable, using optimized local persistent store:', err?.message || 'timeout');
+        console.error('MongoDB connection failed:', err?.message || 'timeout');
         cached!.lastFailedAt = Date.now();
         cached!.promise = null;
+        if (isProduction) throw err;
         return null;
       });
   }
@@ -56,6 +64,7 @@ export async function connectToDatabase(): Promise<typeof mongoose | null> {
   } catch (e) {
     cached!.lastFailedAt = Date.now();
     cached!.promise = null;
+    if (isProduction) throw e;
     return null;
   }
 
@@ -64,4 +73,12 @@ export async function connectToDatabase(): Promise<typeof mongoose | null> {
 
 export function isMongoConnected(): boolean {
   return mongoose.connection.readyState === 1;
+}
+
+export function isProductionEnvironment(): boolean {
+  return isProduction;
+}
+
+export function hasMongoUri(): boolean {
+  return Boolean(MONGODB_URI);
 }

@@ -1,4 +1,4 @@
-import { connectToDatabase } from './db';
+import { connectToDatabase, isProductionEnvironment } from './db';
 import { RateLimitCounterModel } from '../models/RateLimitCounter';
 
 interface MemoryCounter {
@@ -40,6 +40,7 @@ export async function consumeRateLimit(
       };
     } catch (error) {
       console.warn('MongoDB rate limiter unavailable; using local fallback:', error);
+      if (isProductionEnvironment()) throw error;
     }
   }
 

@@ -17,7 +17,10 @@ passages and page numbers behind each answer.
   chat operations.
 - PDF text extraction, page-aware overlapping chunks, embeddings, cosine
   retrieval, and grounded answers with citations.
-- MongoDB-backed rate limits with TTL counters when MongoDB is configured.
+- MongoDB-backed rate limits with TTL counters. Production fails clearly if
+  MongoDB is missing or unreachable; the in-memory store is local/test-only.
+- A noindex `/api/health` endpoint reports safe database and configuration
+  status without returning secrets.
 - Uploads are limited to 10 MB and 100 pages and must contain a PDF header.
 - Scanned/image-only PDFs are not OCR'd yet; upload an OCR'd or text-based PDF.
 - Gemini is used when `GEMINI_API_KEY` is configured. Local deterministic

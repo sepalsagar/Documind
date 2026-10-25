@@ -24,8 +24,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const user = await findUserByEmail(email);
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const user = await findUserByEmail(normalizedEmail);
     if (!user) {
+      console.warn('Login rejected: user not found', { email: normalizedEmail });
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
@@ -34,6 +36,7 @@ export async function POST(req: NextRequest) {
 
     const isMatch = await comparePassword(password, user.passwordHash);
     if (!isMatch) {
+      console.warn('Login rejected: invalid password', { email: normalizedEmail });
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }

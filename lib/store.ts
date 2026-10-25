@@ -1,4 +1,4 @@
-import { connectToDatabase } from './db';
+import { connectToDatabase, isProductionEnvironment } from './db';
 import { UserModel, IUser } from '../models/User';
 import { DocumentModel, IDocument, DocumentStatus } from '../models/Document';
 import { DocumentChunkModel, IDocumentChunk } from '../models/DocumentChunk';
@@ -121,7 +121,7 @@ export async function createUser(data: { name: string; email: string; passwordHa
         createdAt: user.createdAt,
       };
     } catch (e) {
-      // Fallback
+      if (isProductionEnvironment()) throw e;
     }
   }
 
@@ -243,6 +243,7 @@ export async function createDemoUser(templateUserId = '__demo_template__'): Prom
       })));
       return { id: user._id.toString(), name: user.name, email: user.email, isDemo: true, expiresAt, documentId: cloned._id.toString() };
     } catch (error) {
+      if (isProductionEnvironment()) throw error;
       console.warn('Demo user creation fell back to memory store:', error);
     }
   }
@@ -318,7 +319,7 @@ export async function findUserByEmail(email: string): Promise<MemoryUser | null>
         };
       }
     } catch (e) {
-      // Fallback
+      if (isProductionEnvironment()) throw e;
     }
   }
 
@@ -342,7 +343,7 @@ export async function findUserById(id: string): Promise<MemoryUser | null> {
         };
       }
     } catch (e) {
-      // Fallback
+      if (isProductionEnvironment()) throw e;
     }
   }
 
@@ -391,7 +392,7 @@ export async function createDocument(data: {
         updatedAt: doc.updatedAt,
       };
     } catch (e) {
-      // Fallback
+      if (isProductionEnvironment()) throw e;
     }
   }
 
@@ -447,7 +448,7 @@ export async function getUserDocuments(
         updatedAt: d.updatedAt,
       }));
     } catch (e) {
-      // Fallback
+      if (isProductionEnvironment()) throw e;
     }
   }
 
@@ -490,7 +491,7 @@ export async function getDocumentById(id: string, userId: string): Promise<Memor
         };
       }
     } catch (e) {
-      // Fallback
+      if (isProductionEnvironment()) throw e;
     }
   }
 
@@ -531,7 +532,7 @@ export async function updateDocument(
         };
       }
     } catch (e) {
-      // Fallback
+      if (isProductionEnvironment()) throw e;
     }
   }
 
@@ -562,7 +563,7 @@ export async function deleteDocument(id: string, userId: string): Promise<boolea
         return true;
       }
     } catch (e) {
-      // Fallback
+      if (isProductionEnvironment()) throw e;
     }
   }
 
@@ -610,6 +611,7 @@ export async function deleteDocument(id: string, userId: string): Promise<boolea
           expiresAt: created.expiresAt,
         };
       } catch (error) {
+        if (isProductionEnvironment()) throw error;
         console.warn('Conversation persistence unavailable, using local store:', error);
       }
     }
@@ -636,6 +638,7 @@ export async function deleteDocument(id: string, userId: string): Promise<boolea
         const messages = await MessageModel.find({ conversationId, userId, documentId }).sort({ createdAt: 1 }).lean();
         return messages.map((message: any) => ({ ...message, _id: message._id.toString() }));
       } catch (error) {
+        if (isProductionEnvironment()) throw error;
         console.warn('Message history unavailable, using local store:', error);
       }
     }
@@ -662,6 +665,7 @@ export async function deleteDocument(id: string, userId: string): Promise<boolea
         await ConversationModel.updateOne({ _id: data.conversationId, userId: data.userId, documentId: data.documentId }, { $set: { updatedAt: new Date() } });
         return { ...message.toObject(), _id: message._id.toString() } as MemoryMessage;
       } catch (error) {
+        if (isProductionEnvironment()) throw error;
         console.warn('Message persistence unavailable, using local store:', error);
       }
     }
@@ -683,6 +687,7 @@ export async function deleteDocument(id: string, userId: string): Promise<boolea
         await conversation.save();
         return true;
       } catch (error) {
+        if (isProductionEnvironment()) throw error;
         console.warn('Conversation clear unavailable, using local store:', error);
       }
     }
@@ -716,7 +721,7 @@ export async function createDocumentChunks(
       await DocumentChunkModel.insertMany(chunksData);
       return;
     } catch (e) {
-      // Fallback
+      if (isProductionEnvironment()) throw e;
     }
   }
 
@@ -755,7 +760,7 @@ export async function getDocumentChunks(documentId: string): Promise<MemoryDocum
         createdAt: c.createdAt,
       }));
     } catch (e) {
-      // Fallback
+      if (isProductionEnvironment()) throw e;
     }
   }
 

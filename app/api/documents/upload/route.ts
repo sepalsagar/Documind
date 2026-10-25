@@ -5,6 +5,7 @@ import { extractTextFromPdf, chunkDocument, generateEmbeddings } from '@/lib/rag
 import { consumeRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_PAGE_COUNT = 100;
