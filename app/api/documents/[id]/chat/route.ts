@@ -3,6 +3,7 @@ import { getUserFromRequest } from '@/lib/auth';
 import { getDocumentById, getDocumentChunks, getOrCreateConversation, createConversationMessage } from '@/lib/store';
 import { generateEmbedding, retrieveTopK, streamGroundedAnswer } from '@/lib/rag';
 import { consumeRateLimit } from '@/lib/rate-limit';
+import { elapsed, logTiming, serverTiming } from '@/lib/timing';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -11,6 +12,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const started = performance.now();
+  const timings: Record<string, number> = {};
   try {
     const authUser = getUserFromRequest(req);
     if (!authUser) {
@@ -76,11 +79,15 @@ export async function POST(
     }
 
     // 2. Generate embedding for query
+    const embedStarted = performance.now();
     const queryEmbedding = await generateEmbedding(question.trim());
+    timings.embedQuery = elapsed(embedStarted);
 
     // 3. Perform Cosine Similarity Semantic Retrieval
     const k = Math.min(Math.max(1, topK), 5);
+    const searchStarted = performance.now();
     const retrievedChunks = retrieveTopK(queryEmbedding, chunks, k);
+    timings.vectorSearch = elapsed(searchStarted);
 
     // A top-K list always has a "best" entry, even when it is unrelated. Do
     // not turn that implementation detail into an apparently grounded answer.
@@ -90,7 +97,7 @@ export async function POST(
       const conversation = await getOrCreateConversation(authUser.userId, id, expiresAt);
       await createConversationMessage({ conversationId: conversation._id, userId: authUser.userId, documentId: id, role: 'user', content: question.trim(), expiresAt });
       await createConversationMessage({ conversationId: conversation._id, userId: authUser.userId, documentId: id, role: 'assistant', content: 'The document does not contain enough relevant information to answer this question confidently.', expiresAt });
-      return NextResponse.json({
+      const response = NextResponse.json({
         question: question.trim(),
         answer: 'The document does not contain enough relevant information to answer this question confidently.',
         sources: [],
@@ -98,6 +105,10 @@ export async function POST(
         documentId: id,
         documentTitle: doc.title,
       });
+      timings.total = elapsed(started);
+      response.headers.set('Server-Timing', serverTiming(timings));
+      logTiming('/api/documents/:id/chat', timings);
+      return response;
     }
 
     // 4. Grounded AI Generation with Gemini
@@ -156,10 +167,13 @@ export async function POST(
       },
     });
 
+    timings.total = elapsed(started);
+    logTiming('/api/documents/:id/chat', timings);
     return new NextResponse(stream, {
       headers: {
         'Content-Type': 'application/x-ndjson; charset=utf-8',
         'Cache-Control': 'no-cache, no-transform',
+        'Server-Timing': serverTiming(timings),
       },
     });
   } catch (error: any) {

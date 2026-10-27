@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
 import { getUserDocuments, createDocument, createDocumentChunks, updateDocument } from '@/lib/store';
 import { generateEmbedding } from '@/lib/rag';
+import { elapsed, logTiming, serverTiming } from '@/lib/timing';
 
 export async function GET(req: NextRequest) {
+  const started = performance.now();
+  const timings: Record<string, number> = {};
   try {
     const authUser = getUserFromRequest(req);
     if (!authUser) {
@@ -14,7 +17,9 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search') || undefined;
     const status = searchParams.get('status') || undefined;
 
+    const listStarted = performance.now();
     let docs = await getUserDocuments(authUser.userId, { search, status });
+    timings.list = elapsed(listStarted);
 
     // Seed default sample documents if this is the first time the user accesses the library
     if (docs.length === 0 && !search && (!status || status === 'All')) {
@@ -46,6 +51,9 @@ export async function GET(req: NextRequest) {
       response.cookies.set('documind_seeded_' + authUser.userId, 'true', { maxAge: 60 * 60 * 24 * 30 });
     }
 
+    timings.total = elapsed(started);
+    response.headers.set('Server-Timing', serverTiming(timings));
+    logTiming('/api/documents', timings);
     return response;
   } catch (error: any) {
     console.error('Fetch documents error:', error);

@@ -3,6 +3,7 @@ import { getUserFromRequest } from '@/lib/auth';
 import { createDocument, createDocumentChunks, updateDocument } from '@/lib/store';
 import { extractTextFromPdf, chunkDocument, generateEmbeddings } from '@/lib/rag';
 import { consumeRateLimit } from '@/lib/rate-limit';
+import { elapsed, logTiming, serverTiming } from '@/lib/timing';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -11,6 +12,8 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_PAGE_COUNT = 100;
 
 export async function POST(req: NextRequest) {
+  const started = performance.now();
+  const timings: Record<string, number> = {};
   try {
     const authUser = getUserFromRequest(req);
     if (!authUser) {
@@ -27,6 +30,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const readStarted = performance.now();
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
 
@@ -45,6 +49,7 @@ export async function POST(req: NextRequest) {
     const filename = file.name || 'document.pdf';
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    timings.read = elapsed(readStarted);
     if (buffer.length < 5 || buffer.subarray(0, 5).toString('ascii') !== '%PDF-') {
       return NextResponse.json({ error: 'Invalid file format. Please upload a valid PDF document.' }, { status: 400 });
     }
@@ -61,20 +66,26 @@ export async function POST(req: NextRequest) {
 
     try {
       // 1. PDF Text Extraction
+      const extractStarted = performance.now();
       const extraction = await extractTextFromPdf(buffer);
+      timings.extract = elapsed(extractStarted);
 
       if (extraction.pageCount > MAX_PAGE_COUNT) {
         throw new Error(`This PDF has more than ${MAX_PAGE_COUNT} pages. Please upload a shorter document.`);
       }
 
       // 2. Chunking
+      const chunkStarted = performance.now();
       const chunks = chunkDocument(extraction.pages, 180, 30);
+      timings.chunk = elapsed(chunkStarted);
       if (chunks.length === 0) {
         throw new Error('Document produced 0 text chunks.');
       }
 
       // 3. Embedding Generation
+      const embedStarted = performance.now();
       const embeddings = await generateEmbeddings(chunks.map((chunk) => chunk.text));
+      timings.embed = elapsed(embedStarted);
       const chunksData = chunks.map((c, index) => ({
           documentId: doc._id,
           chunkIndex: c.chunkIndex,
@@ -85,7 +96,9 @@ export async function POST(req: NextRequest) {
       }));
 
       // 4. Save Chunks
+      const insertStarted = performance.now();
       await createDocumentChunks(chunksData);
+      timings.insert = elapsed(insertStarted);
 
       // 5. Update Document status to Ready
       const updatedDoc = await updateDocument(doc._id, authUser.userId, {
@@ -94,11 +107,15 @@ export async function POST(req: NextRequest) {
         chunkCount: chunksData.length,
       });
 
-      return NextResponse.json({
+      const response = NextResponse.json({
         success: true,
         document: updatedDoc || doc,
         chunksCreated: chunksData.length,
       });
+      timings.total = elapsed(started);
+      response.headers.set('Server-Timing', serverTiming(timings));
+      logTiming('/api/documents/upload', timings);
+      return response;
     } catch (processError: any) {
       console.error('PDF ingestion error:', processError);
       await updateDocument(doc._id, authUser.userId, {

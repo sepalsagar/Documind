@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { elapsed } from './timing';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const isProduction = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
@@ -40,6 +41,7 @@ export async function connectToDatabase(): Promise<typeof mongoose | null> {
   }
 
   if (!cached!.promise) {
+    const connectionStarted = performance.now();
     const opts = {
       bufferCommands: false,
       serverSelectionTimeoutMS: 5000,
@@ -48,10 +50,11 @@ export async function connectToDatabase(): Promise<typeof mongoose | null> {
     cached!.promise = mongoose
       .connect(MONGODB_URI, opts)
       .then((m) => {
+        console.info(JSON.stringify({ type: 'db_connection', status: 'connected', durationMs: Math.round(elapsed(connectionStarted)) }));
         return m;
       })
       .catch((err) => {
-        console.error('MongoDB connection failed:', err?.message || 'timeout');
+        console.error(JSON.stringify({ type: 'db_connection', status: 'error', errorClass: err?.name || 'UnknownError', durationMs: Math.round(elapsed(connectionStarted)) }));
         cached!.lastFailedAt = Date.now();
         cached!.promise = null;
         if (isProduction) throw err;

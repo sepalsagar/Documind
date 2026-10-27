@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
 import { getDocumentById, getDocumentChunks } from '@/lib/store';
+import { elapsed, logTiming, serverTiming } from '@/lib/timing';
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const started = performance.now();
   try {
     const authUser = getUserFromRequest(req);
     if (!authUser) {
@@ -29,11 +31,15 @@ export async function GET(
       snippet: c.text.slice(0, 100) + '...',
     }));
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       documentId: id,
       totalChunks: chunks.length,
       chunks: chunkMetadata,
     });
+    const timings = { total: elapsed(started) };
+    response.headers.set('Server-Timing', serverTiming(timings));
+    logTiming('/api/documents/:id/chunks', timings);
+    return response;
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
