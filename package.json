@@ -13,6 +13,7 @@
     "flag:raw-pdf": "tsx scripts/flag-raw-pdf-documents.ts",
     "screenshots": "node scripts/capture-screenshots.mjs",
     "e2e": "node scripts/e2e.mjs",
+    "eval": "tsx scripts/eval-rag.ts",
     "clean": "next clean"
   },
   "dependencies": {

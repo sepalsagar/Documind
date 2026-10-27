@@ -55,7 +55,7 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { question, topK = 3 } = body;
+    const { question, topK = 4 } = body;
 
     if (!question || typeof question !== 'string' || question.trim().length === 0) {
       return NextResponse.json({ error: 'Please provide a valid question.' }, { status: 400 });

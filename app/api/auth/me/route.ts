@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
     const authUser = getUserFromRequest(req);
     if (!authUser) {
       const response = NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      response.cookies.set('documind_token', '', { httpOnly: true, maxAge: 0, path: '/' });
       response.headers.set('Server-Timing', serverTiming({ verify: elapsed(started), total: elapsed(started) }));
       return response;
     }

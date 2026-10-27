@@ -182,7 +182,7 @@ export default function WorkspaceView({
         },
         body: JSON.stringify({
           question: questionToSend,
-          topK: 3,
+          topK: 4,
         }),
       });
 

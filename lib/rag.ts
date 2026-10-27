@@ -144,12 +144,17 @@ export function chunkDocument(
 /**
  * 3. Embedding Generation via Gemini / Semantic Vector Model
  */
-export async function generateEmbedding(text: string): Promise<number[]> {
-  const [embedding] = await generateEmbeddings([text]);
+export type EmbeddingTask = 'RETRIEVAL_DOCUMENT' | 'RETRIEVAL_QUERY';
+
+export async function generateEmbedding(text: string, taskType: EmbeddingTask = 'RETRIEVAL_QUERY'): Promise<number[]> {
+  const [embedding] = await generateEmbeddings([text], taskType);
   return embedding;
 }
 
-export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
+export async function generateEmbeddings(
+  texts: string[],
+  taskType: EmbeddingTask = 'RETRIEVAL_DOCUMENT'
+): Promise<number[][]> {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (apiKey && apiKey !== 'MY_GEMINI_API_KEY' && apiKey !== 'YOUR_GEMINI_API_KEY') {
@@ -157,6 +162,7 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
       const response: any = await withTimeout(ai.models.embedContent({
         model: 'gemini-embedding-2-preview',
         contents: texts,
+        config: { taskType },
       }), EMBEDDING_TIMEOUT_MS, 'Embedding request timed out.');
 
       const values = response.embeddings
@@ -351,7 +357,7 @@ export async function streamGroundedAnswer(
   const systemInstruction = `You are DocuMind, an AI Document Assistant. Answer using ONLY the provided document context. If the answer cannot be determined, say so. Cite facts with [1], [2], or [3].`;
 
   if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'MY_GEMINI_API_KEY' || process.env.GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY') {
-    onText(`Based on the document context [1]: "${retrievedChunks[0]?.text.slice(0, 200) || 'No relevant passage found'}..."`);
+    onText(`Basic answer - AI unavailable. Based on the document context [1]: "${retrievedChunks[0]?.text.slice(0, 200) || 'No relevant passage found'}..."`);
     return Date.now() - startTime;
   }
 
@@ -366,7 +372,7 @@ export async function streamGroundedAnswer(
     }
   } catch (error: any) {
     console.warn('Gemini streaming failed, using contextual fallback:', error?.message);
-    onText(`Based on the document context [1]: "${retrievedChunks[0]?.text.slice(0, 200) || 'No relevant passage found'}..."`);
+    onText(`Basic answer - AI unavailable. Based on the document context [1]: "${retrievedChunks[0]?.text.slice(0, 200) || 'No relevant passage found'}..."`);
   }
   return Date.now() - startTime;
 }
