@@ -7,12 +7,16 @@ import Header from '@/components/Header';
 import LoginView from '@/components/views/LoginView';
 import RegisterView from '@/components/views/RegisterView';
 import DashboardView, { DocumentItem } from '@/components/views/DashboardView';
-import WorkspaceView from '@/components/views/WorkspaceView';
+import dynamic from 'next/dynamic';
 import SettingsView from '@/components/views/SettingsView';
 import UploadModal from '@/components/UploadModal';
 import RenameModal from '@/components/RenameModal';
 import DeleteModal from '@/components/DeleteModal';
 import { Loader2 } from 'lucide-react';
+
+const WorkspaceView = dynamic(() => import('@/components/views/WorkspaceView'), {
+  loading: () => <div className="flex h-full items-center justify-center text-sm text-slate-500">Loading workspace…</div>,
+});
 
 function AppContent() {
   const { user, loading, authError, retryAuth } = useAuth();

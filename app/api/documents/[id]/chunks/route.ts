@@ -24,7 +24,7 @@ export async function GET(
     const chunks = await getDocumentChunks(id);
 
     // Return lightweight chunk metadata for visualization
-    const chunkMetadata = chunks.map((c) => ({
+    const chunkMetadata = chunks.slice(0, 20).map((c) => ({
       chunkIndex: c.chunkIndex,
       pageNumber: c.pageNumber,
       tokenCount: c.tokenCount,
@@ -34,6 +34,7 @@ export async function GET(
     const response = NextResponse.json({
       documentId: id,
       totalChunks: chunks.length,
+      returnedChunks: chunkMetadata.length,
       chunks: chunkMetadata,
     });
     const timings = { total: elapsed(started) };
