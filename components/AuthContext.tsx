@@ -7,6 +7,7 @@ export interface User {
   name: string;
   email: string;
   isDemo?: boolean;
+  expiresAt?: number;
 }
 
 interface AuthContextType {

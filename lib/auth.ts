@@ -31,7 +31,10 @@ export async function comparePassword(password: string, hash: string): Promise<b
 }
 
 export function signToken(payload: TokenPayload): string {
-  return jwt.sign(payload, jwtSecret(), { expiresIn: '7d' });
+  const expiresIn = payload.isDemo && payload.expiresAt
+    ? Math.max(1, Math.ceil((payload.expiresAt - Date.now()) / 1000))
+    : '7d';
+  return jwt.sign(payload, jwtSecret(), { expiresIn });
 }
 
 export function verifyToken(token: string): TokenPayload | null {

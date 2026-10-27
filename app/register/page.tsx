@@ -9,7 +9,7 @@ function RegisterContent() {
   const router = useRouter();
   const { user } = useAuth();
   useEffect(() => {
-    if (user) router.replace('/app');
+    if (user && !user.isDemo) router.replace('/app');
   }, [router, user]);
   return <RegisterView onSwitchToLogin={() => router.push('/login')} />;
 }

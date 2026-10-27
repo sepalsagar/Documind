@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Zap,
   Menu,
+  LogOut,
 } from 'lucide-react';
 import { useAuth } from './AuthContext';
 
@@ -25,7 +26,7 @@ export default function Header({
   breadcrumb = 'Workspace > Intelligence Hub',
   onOpenMobileNav,
 }: HeaderProps) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   return (
     <header
@@ -58,6 +59,9 @@ export default function Header({
         <div className="absolute left-1/2 top-16 hidden -translate-x-1/2 items-center gap-3 rounded-b-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-900 shadow-sm lg:flex">
           <span>Demo workspace - data is deleted after 24 hours</span>
           <a href="/register" className="font-bold text-teal-700 hover:underline">Create a free account</a>
+          <button type="button" onClick={() => void logout()} className="inline-flex items-center gap-1 font-bold text-slate-700 hover:text-slate-950">
+            <LogOut className="h-3.5 w-3.5" aria-hidden="true" /> End demo
+          </button>
         </div>
       )}
 

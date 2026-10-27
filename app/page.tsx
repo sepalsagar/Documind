@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { cookies } from 'next/headers';
 import {
   ArrowRight,
   BrainCircuit,
@@ -12,9 +11,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
-import { redirect } from 'next/navigation';
-import { verifyToken } from '@/lib/auth';
-import DemoButton from '@/components/DemoButton';
+import LandingSessionControls from '@/components/LandingSessionControls';
 
 export const metadata: Metadata = {
   title: 'DocuMind — AI Document Assistant',
@@ -30,12 +27,7 @@ const steps = [
   ['05', 'Verify the answer', 'Review the answer alongside page-level citations.'],
 ];
 
-export default async function LandingPage() {
-  const token = (await cookies()).get('documind_token')?.value;
-  if (token && verifyToken(token)) {
-    redirect('/app');
-  }
-
+export default function LandingPage() {
   return (
     <main className="min-h-screen overflow-hidden bg-slate-950 text-white">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
@@ -56,10 +48,7 @@ export default async function LandingPage() {
             </span>
             <span className="text-xl font-extrabold tracking-tight">DocuMind</span>
           </Link>
-          <div className="flex items-center gap-3">
-            <Link href="/login" className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-300 hover:text-white">Sign in</Link>
-            <Link href="/register" className="rounded-lg bg-teal-400 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-teal-300">Sign up</Link>
-          </div>
+          <LandingSessionControls location="header" />
         </nav>
 
         <div className="mx-auto grid max-w-7xl gap-16 px-6 pb-24 pt-20 lg:grid-cols-[1.05fr_.95fr] lg:items-center lg:px-8 lg:pb-32 lg:pt-28">
@@ -76,7 +65,7 @@ export default async function LandingPage() {
                 Start for free <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
               <Link href="/login" className="rounded-xl border border-slate-700 px-5 py-3.5 text-sm font-bold text-white hover:border-slate-500">Sign in</Link>
-              <DemoButton className="inline-flex items-center gap-2 rounded-xl border border-teal-400/40 px-5 py-3.5 text-sm font-bold text-teal-200 hover:bg-teal-400/10" />
+              <LandingSessionControls location="hero" />
             </div>
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-400">
               <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-teal-400" aria-hidden="true" /> Private per-user document access</span>

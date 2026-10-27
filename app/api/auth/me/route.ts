@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
-import { findUserById } from '@/lib/store';
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,17 +8,28 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const user = await findUserById(authUser.userId);
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (authUser.isDemo) {
+      if (!authUser.expiresAt || authUser.expiresAt <= Date.now()) {
+        const response = NextResponse.json({ error: 'Demo expired' }, { status: 401 });
+        response.cookies.set('documind_token', '', { httpOnly: true, maxAge: 0, path: '/' });
+        return response;
+      }
+      const { findUserById } = await import('@/lib/store');
+      const user = await findUserById(authUser.userId);
+      if (!user) {
+        const response = NextResponse.json({ error: 'Demo expired' }, { status: 401 });
+        response.cookies.set('documind_token', '', { httpOnly: true, maxAge: 0, path: '/' });
+        return response;
+      }
     }
 
     return NextResponse.json({
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        createdAt: user.createdAt,
+        id: authUser.userId,
+        name: authUser.name,
+        email: authUser.email,
+        isDemo: Boolean(authUser.isDemo),
+        expiresAt: authUser.expiresAt,
       },
     });
   } catch (error: any) {
