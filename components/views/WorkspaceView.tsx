@@ -121,7 +121,7 @@ export default function WorkspaceView({
             id: message._id,
             sender: message.role,
             text: message.content,
-            sources: (message.sources || []).map((source: any, index: number) => ({
+            sources: (message.sources || []).filter((source: any) => Number.isInteger(Number(source.page)) && Number(source.page) >= 1 && Number(source.page) <= doc.pageCount).map((source: any, index: number) => ({
               sourceId: index + 1,
               chunkIndex: Number(source.chunkId),
               pageNumber: source.page,
@@ -216,7 +216,7 @@ export default function WorkspaceView({
         id: `assistant_${Date.now()}`,
         sender: 'assistant',
         text: data.answer,
-        sources: data.sources || [],
+        sources: (data.sources || []).filter((source: SourceItem) => Number.isInteger(Number(source.pageNumber)) && Number(source.pageNumber) >= 1 && Number(source.pageNumber) <= doc.pageCount),
         latencyMs: data.latencyMs || 320,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
@@ -532,9 +532,9 @@ export default function WorkspaceView({
                       <div className="space-y-3">
                         {/* Strictly Grounded Badge for AI responses */}
                         <div className="flex items-center justify-between pb-2 border-b border-slate-100 text-xs">
-                          <span className="inline-flex items-center space-x-1 font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200/60 text-[11px]">
+                          <span className={`inline-flex items-center space-x-1 font-semibold px-2 py-0.5 rounded-md border text-[11px] ${msg.text.startsWith('Basic answer - AI unavailable.') ? 'text-amber-700 bg-amber-50 border-amber-200/60' : 'text-teal-700 bg-teal-50 border-teal-200/60'}`}>
                             <Sparkles className="h-3 w-3" />
-                            <span>Evidence-backed response</span>
+                          <span>{msg.text.startsWith('Basic answer - AI unavailable.') ? 'Basic answer - AI unavailable' : 'Evidence-backed response'}</span>
                           </span>
 
                           <button

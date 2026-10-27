@@ -303,7 +303,7 @@ GROUNDED ANSWER (with citations):`;
 
   try {
     const response = await withTimeout(ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         systemInstruction,
@@ -357,13 +357,13 @@ export async function streamGroundedAnswer(
   const systemInstruction = `You are DocuMind, an AI Document Assistant. Answer using ONLY the provided document context. If the answer cannot be determined, say so. Cite facts with [1], [2], or [3].`;
 
   if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'MY_GEMINI_API_KEY' || process.env.GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY') {
-    onText(`Basic answer - AI unavailable. Based on the document context [1]: "${retrievedChunks[0]?.text.slice(0, 200) || 'No relevant passage found'}..."`);
+    onText(buildFallbackAnswer(retrievedChunks));
     return Date.now() - startTime;
   }
 
   try {
     const stream = await withTimeout(ai.models.generateContentStream({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: { systemInstruction, temperature: 0.1 },
     }), ANSWER_TIMEOUT_MS, 'Answer generation timed out.');
@@ -372,7 +372,18 @@ export async function streamGroundedAnswer(
     }
   } catch (error: any) {
     console.warn('Gemini streaming failed, using contextual fallback:', error?.message);
-    onText(`Basic answer - AI unavailable. Based on the document context [1]: "${retrievedChunks[0]?.text.slice(0, 200) || 'No relevant passage found'}..."`);
+    onText(buildFallbackAnswer(retrievedChunks));
   }
   return Date.now() - startTime;
+}
+
+export function buildFallbackAnswer(retrievedChunks: RetrievedChunk[]): string {
+  if (retrievedChunks.length === 0) {
+    return "I couldn't find this in the document.";
+  }
+  const passages = retrievedChunks
+    .slice(0, 4)
+    .map((chunk, index) => `[${index + 1}] Page ${chunk.pageNumber}: ${chunk.text.trim()}`)
+    .join('\n');
+  return `Basic answer - AI unavailable. The following relevant passages may help:\n\n${passages}`;
 }

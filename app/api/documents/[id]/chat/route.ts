@@ -86,7 +86,8 @@ export async function POST(
     // 3. Perform Cosine Similarity Semantic Retrieval
     const k = Math.min(Math.max(1, topK), 5);
     const searchStarted = performance.now();
-    const retrievedChunks = retrieveTopK(queryEmbedding, chunks, k);
+    const retrievedChunks = retrieveTopK(queryEmbedding, chunks, k)
+      .filter((chunk) => Number.isInteger(chunk.pageNumber) && chunk.pageNumber >= 1 && chunk.pageNumber <= doc.pageCount);
     timings.vectorSearch = elapsed(searchStarted);
 
     // A top-K list always has a "best" entry, even when it is unrelated. Do

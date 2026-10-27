@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chunkDocument, cosineSimilarity, extractTextFromPdf, isUsableDocumentText } from '../lib/rag';
+import { buildFallbackAnswer, chunkDocument, cosineSimilarity, extractTextFromPdf, isUsableDocumentText } from '../lib/rag';
 import { readFileSync } from 'node:fs';
 import { createDemoUser, createDocument, createDocumentChunks, getDocumentById, getDocumentChunks, getOrCreateConversation, createConversationMessage, getConversationMessages } from '../lib/store';
 import { consumeRateLimit } from '../lib/rate-limit';
@@ -34,6 +34,19 @@ describe('RAG primitives', () => {
     expect(cosineSimilarity([1, 0], [1, 0])).toBe(1);
     expect(cosineSimilarity([1, 0], [0, 1])).toBe(0);
     expect(cosineSimilarity([1, 0], [1, 1])).toBeCloseTo(Math.SQRT1_2);
+  });
+
+  it('uses grounded passages and valid page citations in the unavailable-AI fallback', () => {
+    const answer = buildFallbackAnswer([
+      { chunkIndex: 0, pageNumber: 2, text: 'Leave requests require five working days notice.', tokenCount: 8, similarity: 0.58, similarityScore: 58 },
+    ]);
+    expect(answer).toContain('Basic answer - AI unavailable.');
+    expect(answer).toContain('[1] Page 2: Leave requests require five working days notice.');
+    expect(answer).not.toContain('Page 258%');
+  });
+
+  it('states when no passage can answer the question', () => {
+    expect(buildFallbackAnswer([])).toBe("I couldn't find this in the document.");
   });
 
   it('does not return another user’s document', async () => {

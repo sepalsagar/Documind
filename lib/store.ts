@@ -181,15 +181,18 @@ export async function createDemoUser(templateUserId = '__demo_template__'): Prom
         demoTemplatePromise = (async () => {
           const db = await connectToDatabase();
           if (!db) return;
-          const existing = await DocumentModel.findOne({ isTemplate: true, userId: templateUserId }).select('_id').lean();
-          if (existing) return;
-
-          const text = [
-            'Northstar Labs Leave and Expense Policy',
-            'Leave: full-time employees accrue 1.5 paid leave days each month. Submit leave requests five working days before the first day away.',
-            'Expenses: business travel requires manager pre-approval. Submit itemized receipts within 30 days of the expense.',
-            'Questions about exceptions should be sent to People Operations.',
-          ].join(' ');
+          const existing = await DocumentModel.findOne({ isTemplate: true, userId: templateUserId }).select('_id chunkCount').lean();
+          const existingChunkCount = existing ? await DocumentChunkModel.countDocuments({ documentId: existing._id.toString() }) : 0;
+          if (existing && existingChunkCount >= 3) return;
+          if (existing) {
+            await DocumentChunkModel.deleteMany({ documentId: existing._id.toString() });
+            await DocumentModel.deleteOne({ _id: existing._id });
+          }
+          const pages = [
+            'Northstar Labs Leave and Expense Policy. The policy explains how full-time employees request paid leave and how business travel expenses are reimbursed.',
+            'Leave policy: full-time employees accrue 1.5 paid leave days each month. Submit leave requests five working days before the first day away, except emergencies. Managers approve requests in the team calendar.',
+            'Expense policy: business travel requires manager pre-approval. Submit itemized receipts within 30 days and use the company travel card when available. Finance reviews exceptions and People Operations answers leave questions.',
+          ];
           const { generateEmbedding } = await import('./rag');
           try {
             const template = await DocumentModel.create({
@@ -198,19 +201,19 @@ export async function createDemoUser(templateUserId = '__demo_template__'): Prom
               originalName: 'northstar-leave-expense-policy.pdf',
               fileSize: 0,
               pageCount: 3,
-              chunkCount: 1,
+              chunkCount: pages.length,
               status: 'Ready',
               isTemplate: true,
             });
-            await DocumentChunkModel.create({
+            await DocumentChunkModel.insertMany(await Promise.all(pages.map(async (text, index) => ({
               documentId: template._id.toString(),
-              chunkIndex: 0,
-              pageNumber: 2,
+              chunkIndex: index,
+              pageNumber: index + 1,
               text,
-              embedding: await generateEmbedding(text),
+              embedding: await generateEmbedding(text, 'RETRIEVAL_DOCUMENT'),
               tokenCount: Math.round(text.split(/\s+/).length * 1.3),
               isTemplate: true,
-            });
+            }))));
           } catch (error: any) {
             if (error?.code !== 11000) throw error;
           }
