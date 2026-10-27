@@ -53,14 +53,17 @@ export default function DashboardView({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Ready' | 'Processing' | 'Failed'>('All');
   const [refreshCount, setRefreshCount] = useState(0);
+  const refreshInFlight = React.useRef(false);
 
   useEffect(() => {
     let ignore = false;
+    const controller = new AbortController();
 
     fetch('/api/documents', {
       // The session is an HttpOnly cookie. Only add a bearer header when a
       // caller explicitly has one; `Bearer null` is neither useful nor safe.
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      signal: controller.signal,
     })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed'))))
       .then((data) => {
@@ -71,6 +74,7 @@ export default function DashboardView({
         }
       })
       .catch((err) => {
+        if (err?.name === 'AbortError') return;
         console.error('Error fetching documents:', err);
         if (!ignore) {
           setLoadError('We could not load your documents. Check your connection and try again.');
@@ -80,12 +84,18 @@ export default function DashboardView({
 
     return () => {
       ignore = true;
+      controller.abort();
     };
   }, [token, refreshCount]);
 
   const handleRefresh = () => {
+    if (refreshInFlight.current) return;
+    refreshInFlight.current = true;
     setLoading(true);
     setRefreshCount((c) => c + 1);
+    window.setTimeout(() => {
+      refreshInFlight.current = false;
+    }, 500);
   };
 
   const flagForReupload = async (doc: DocumentItem) => {

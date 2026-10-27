@@ -303,7 +303,7 @@ GROUNDED ANSWER (with citations):`;
 
   try {
     const response = await withTimeout(ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       contents: prompt,
       config: {
         systemInstruction,
@@ -363,7 +363,7 @@ export async function streamGroundedAnswer(
 
   try {
     const stream = await withTimeout(ai.models.generateContentStream({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       contents: prompt,
       config: { systemInstruction, temperature: 0.1 },
     }), ANSWER_TIMEOUT_MS, 'Answer generation timed out.');

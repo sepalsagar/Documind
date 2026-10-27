@@ -79,6 +79,8 @@ export default function WorkspaceView({
   const [conversationId, setConversationId] = useState<string | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatInFlightRef = useRef(false);
+  const chatAbortRef = useRef<AbortController | null>(null);
 
   // Suggested Quick Synthesis Queries
   const suggestedQueries = [
@@ -108,6 +110,11 @@ export default function WorkspaceView({
 
   // Load persisted conversation history, falling back to a welcome message.
   useEffect(() => {
+    chatAbortRef.current?.abort();
+    chatAbortRef.current = null;
+    chatInFlightRef.current = false;
+    setLoading(false);
+    setQueryStage('');
     let ignore = false;
     async function loadConversation() {
       try {
@@ -150,7 +157,10 @@ export default function WorkspaceView({
       }
     }
     loadConversation();
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+      chatAbortRef.current?.abort();
+    };
   }, [doc]);
 
   useEffect(() => {
@@ -159,7 +169,10 @@ export default function WorkspaceView({
 
   const handleSendQuestion = async (queryText?: string) => {
     const questionToSend = (queryText || inputQuestion).trim();
-    if (!questionToSend || loading) return;
+    if (!questionToSend || loading || chatInFlightRef.current) return;
+    chatInFlightRef.current = true;
+    const controller = new AbortController();
+    chatAbortRef.current = controller;
 
     const userMsg: ChatMessage = {
       id: `user_${Date.now()}`,
@@ -176,6 +189,7 @@ export default function WorkspaceView({
     try {
       const res = await fetch(`/api/documents/${doc._id}/chat`, {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
@@ -204,10 +218,25 @@ export default function WorkspaceView({
         buffer = lines.pop() || '';
         for (const line of lines) {
           if (!line.trim()) continue;
-          const event = JSON.parse(line);
+          let event: any;
+          try {
+            event = JSON.parse(line);
+          } catch {
+            continue;
+          }
           if (event.type === 'stage') setQueryStage(event.stage);
           if (event.type === 'text') setQueryStage('Generating grounded answer…');
+          if (event.type === 'error') throw new Error(event.error || 'The answer could not be completed.');
           if (event.type === 'complete') data = event;
+        }
+      }
+      if (buffer.trim()) {
+        try {
+          const event = JSON.parse(buffer);
+          if (event.type === 'complete') data = event;
+          if (event.type === 'error') throw new Error(event.error || 'The answer could not be completed.');
+        } catch (error) {
+          if (error instanceof Error && error.message !== 'Unexpected end of JSON input') throw error;
         }
       }
       if (!data) throw new Error('The answer stream ended before completion.');
@@ -227,6 +256,7 @@ export default function WorkspaceView({
         setActiveSourceId(data.sources[0]?.sourceId || null);
       }
     } catch (err: any) {
+      if (err?.name === 'AbortError') return;
       setMessages((prev) => [
         ...prev,
         {
@@ -237,6 +267,8 @@ export default function WorkspaceView({
         },
       ]);
     } finally {
+      chatInFlightRef.current = false;
+      if (chatAbortRef.current === controller) chatAbortRef.current = null;
       setLoading(false);
       setQueryStage('');
     }

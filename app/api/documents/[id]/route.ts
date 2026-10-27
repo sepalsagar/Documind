@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
-import { getDocumentById, updateDocument, deleteDocument, getDocumentChunks } from '@/lib/store';
+import { getDocumentById, updateDocument, deleteDocument, getDocumentChunkCount } from '@/lib/store';
 import { elapsed, logTiming, serverTiming } from '@/lib/timing';
 
 export async function GET(
@@ -25,12 +25,12 @@ export async function GET(
     }
 
     const chunksStarted = performance.now();
-    const chunks = await getDocumentChunks(id);
+    const chunkCount = await getDocumentChunkCount(id);
     timings.chunks = elapsed(chunksStarted);
 
     const response = NextResponse.json({
       document: doc,
-      chunkCount: chunks.length,
+      chunkCount,
     });
     timings.total = elapsed(started);
     response.headers.set('Server-Timing', serverTiming(timings));

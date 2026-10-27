@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
 import { hashPassword, comparePassword, signToken, verifyToken } from '../lib/auth';
 import {
   createUser,
@@ -100,25 +101,13 @@ async function runQA() {
 
   // 2. PDF Processing & Chunking
   console.log('\n2. PDF Extraction & Chunking:');
-  const samplePdf = `DocuMind Enterprise Product Whitepaper.
-Section 1: Distributed Vector Indexing.
-The retrieval augmented generation pipeline chunks documents into overlapping windows of 180 words.
-Each chunk contains page numbers, word token bounds, and vector embeddings generated using gemini-embedding-2-preview.
-
-Section 2: Financial Metrics.
-Quarterly operating revenue reached $128.5 million, an expansion of 42% year over year.
-Gross retention exceeded 99.1% with net revenue retention at 124%.
-
-Section 3: Zero-Hallucination Guardrails.
-Answers are generated strictly using retrieved contexts.
-When information is missing, the model returns a statement of insufficient information.`;
+  const samplePdf = readFileSync('scripts/demo-policy.pdf');
 
   let pages: any[] = [];
   let chunks: any[] = [];
 
   await runAsync('Extract text and structure into pages', async () => {
-    const buffer = Buffer.from(samplePdf, 'utf-8');
-    const ext = await extractTextFromPdf(buffer);
+    const ext = await extractTextFromPdf(samplePdf);
     assert.ok(ext.fullText.length > 100);
     pages = ext.pages;
     assert.ok(pages.length >= 1);
@@ -195,7 +184,7 @@ When information is missing, the model returns a statement of insufficient infor
 
   // 4. Semantic Search & Grounded Generation
   console.log('\n4. Semantic Retrieval & Grounded Generation:');
-  const validQuestion = 'What was the quarterly operating revenue and net retention?';
+  const validQuestion = 'How many paid leave days do employees accrue each month?';
   let retrievedForQ: any[] = [];
 
   await runAsync('Top-K Cosine Similarity Retrieval for grounded question', async () => {
@@ -205,7 +194,7 @@ When information is missing, the model returns a statement of insufficient infor
     assert.ok(retrievedForQ.length > 0);
     assert.ok(retrievedForQ[0].similarity > 0);
     const joined = retrievedForQ.map((c) => c.text).join(' ');
-    assert.ok(joined.includes('128.5 million') || joined.includes('revenue') || joined.includes('retention'));
+    assert.ok(joined.includes('1.5 paid leave days') || joined.includes('leave'));
   });
 
   await runAsync('Grounded answer generation with Gemini and citations', async () => {

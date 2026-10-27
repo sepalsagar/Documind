@@ -140,31 +140,41 @@ export async function POST(
         const send = (payload: Record<string, unknown>) => {
           controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
         };
-        send({ type: 'stage', stage: 'Generating grounded answer…' });
-        let answer = '';
-        const latencyMs = await streamGroundedAnswer(question.trim(), retrievedChunks, (text) => {
-          answer += text;
-          send({ type: 'text', text });
-        });
-        send({
-          type: 'complete',
-          question: question.trim(),
-          answer,
-          sources,
-          latencyMs,
-          documentId: id,
-          documentTitle: doc.title,
-        });
-        await createConversationMessage({
-          conversationId: conversation._id,
-          userId: authUser.userId,
-          documentId: id,
-          role: 'assistant',
-          content: answer,
-          sources: sources.map((source) => ({ page: source.pageNumber, chunkId: String(source.chunkIndex), score: source.similarity })),
-          expiresAt,
-        });
-        controller.close();
+        try {
+          send({ type: 'stage', stage: 'Generating grounded answer…' });
+          let answer = '';
+          const latencyMs = await streamGroundedAnswer(question.trim(), retrievedChunks, (text) => {
+            answer += text;
+            send({ type: 'text', text });
+          });
+          send({
+            type: 'complete',
+            question: question.trim(),
+            answer,
+            sources,
+            latencyMs,
+            documentId: id,
+            documentTitle: doc.title,
+          });
+          try {
+            await createConversationMessage({
+              conversationId: conversation._id,
+              userId: authUser.userId,
+              documentId: id,
+              role: 'assistant',
+              content: answer,
+              sources: sources.map((source) => ({ page: source.pageNumber, chunkId: String(source.chunkIndex), score: source.similarity })),
+              expiresAt,
+            });
+          } catch (persistenceError) {
+            console.error('Chat history persistence error:', persistenceError);
+          }
+        } catch (streamError) {
+          console.error('Chat stream error:', streamError);
+          send({ type: 'error', error: 'The answer could not be completed. Please try again.' });
+        } finally {
+          controller.close();
+        }
       },
     });
 

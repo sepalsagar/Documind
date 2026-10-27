@@ -765,6 +765,7 @@ export async function getDocumentChunks(documentId: string): Promise<MemoryDocum
     } catch (e) {
       if (isProductionEnvironment()) throw e;
     }
+
   }
 
   const chunks = Array.from(memoryStore.chunks.values())
@@ -772,4 +773,17 @@ export async function getDocumentChunks(documentId: string): Promise<MemoryDocum
     .sort((a, b) => a.chunkIndex - b.chunkIndex);
 
   return chunks;
+}
+
+export async function getDocumentChunkCount(documentId: string): Promise<number> {
+  const db = await connectToDatabase();
+  if (db) {
+    try {
+      return await DocumentChunkModel.countDocuments({ documentId });
+    } catch (error) {
+      if (isProductionEnvironment()) throw error;
+      console.warn('Chunk count lookup fell back to memory store:', error);
+    }
+  }
+  return Array.from(memoryStore.chunks.values()).filter((chunk) => chunk.documentId === documentId).length;
 }
