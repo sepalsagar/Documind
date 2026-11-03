@@ -5,7 +5,6 @@ import {
   UploadCloud,
   Search,
   Bell,
-  Sparkles,
   ShieldCheck,
   Zap,
   Menu,
@@ -23,7 +22,7 @@ interface HeaderProps {
 export default function Header({
   onOpenUpload,
   title = 'Document Intelligence',
-  breadcrumb = 'Workspace > Intelligence Hub',
+  breadcrumb = 'Workspace',
   onOpenMobileNav,
 }: HeaderProps) {
   const { user, logout } = useAuth();
@@ -31,7 +30,7 @@ export default function Header({
   return (
     <header
       id="top_app_header"
-      className="h-16 shrink-0 bg-white border-b border-slate-200/80 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 shadow-xs"
+      className="app-header h-16 shrink-0 bg-white border-b border-slate-200/80 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 shadow-xs"
     >
       {/* Left Breadcrumbs & Title & Mobile Toggle */}
       <div className="flex items-center space-x-3 sm:space-x-4">
@@ -46,7 +45,7 @@ export default function Header({
           </button>
         )}
         <div>
-          <div className="flex items-center space-x-2 text-[11px] font-mono uppercase tracking-wider text-slate-400">
+          <div className="flex items-center space-x-2 text-[11px] font-mono text-slate-400">
             <span>DocuMind</span>
             <span>/</span>
             <span className="text-teal-600 font-semibold">{breadcrumb}</span>
@@ -73,17 +72,16 @@ export default function Header({
           className="hidden md:flex items-center space-x-2 px-3 py-1 rounded-full bg-teal-50 border border-teal-200/80 text-teal-800 text-xs font-medium"
         >
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
           </span>
-          <span className="font-mono text-[11px] font-semibold">RAG Pipeline Active</span>
+          <span className="font-mono text-[11px] font-semibold">Index ready</span>
         </div>
 
         {/* Primary Upload CTA Button */}
         <button
           id="header_upload_cta_btn"
           onClick={onOpenUpload}
-          className="inline-flex items-center space-x-2 px-4 py-2 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-all cursor-pointer"
+          className="inline-flex items-center space-x-2 px-4 py-2 text-sm font-semibold text-white bg-teal-700 hover:bg-teal-800 active:bg-teal-900 rounded-lg transition-colors cursor-pointer"
         >
           <UploadCloud className="h-4 w-4" />
           <span>Upload Document</span>

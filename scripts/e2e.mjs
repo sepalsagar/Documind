@@ -11,7 +11,7 @@ const fixture = resolve('scripts/demo-policy.pdf');
 
 try {
   await page.goto(`${baseUrl}/`);
-  await page.getByText('Try the demo', { exact: true }).first().waitFor();
+  await page.getByText('Explore demo', { exact: true }).waitFor();
 
   await page.goto(`${baseUrl}/register`);
   await page.locator('#register_name').fill('E2E Tester');

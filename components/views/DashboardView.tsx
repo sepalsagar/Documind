@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useDeferredValue, useMemo } from 'react';
 import {
   UploadCloud,
   FileText,
@@ -46,20 +46,27 @@ export default function DashboardView({
   onRenameDoc,
   onDeleteDoc,
 }: DashboardViewProps) {
-  const { user, token } = useAuth();
+  const { token } = useAuth();
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Ready' | 'Processing' | 'Failed'>('All');
+  const [page, setPage] = useState(1);
+  const [stats, setStats] = useState({ total: 0, ready: 0, processing: 0, failed: 0 });
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [refreshCount, setRefreshCount] = useState(0);
   const refreshInFlight = React.useRef(false);
+  const deferredSearch = useDeferredValue(searchQuery);
 
   useEffect(() => {
     let ignore = false;
     const controller = new AbortController();
 
-    fetch('/api/documents', {
+    const params = new URLSearchParams({ page: String(page), pageSize: '25' });
+    if (view === 'documents' && deferredSearch.trim()) params.set('search', deferredSearch.trim());
+    if (view === 'documents' && statusFilter !== 'All') params.set('status', statusFilter);
+    fetch(`/api/documents?${params.toString()}`, {
       // The session is an HttpOnly cookie. Only add a bearer header when a
       // caller explicitly has one; `Bearer null` is neither useful nor safe.
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -69,6 +76,8 @@ export default function DashboardView({
       .then((data) => {
         if (!ignore) {
           setDocuments(data.documents || []);
+          setStats(data.stats || { total: 0, ready: 0, processing: 0, failed: 0 });
+          setPagination(data.pagination || { page: 1, totalPages: 1, total: 0 });
           setLoadError(null);
           setLoading(false);
         }
@@ -86,7 +95,7 @@ export default function DashboardView({
       ignore = true;
       controller.abort();
     };
-  }, [token, refreshCount]);
+  }, [token, refreshCount, page, deferredSearch, statusFilter, view]);
 
   const handleRefresh = () => {
     if (refreshInFlight.current) return;
@@ -109,18 +118,9 @@ export default function DashboardView({
     handleRefresh();
   };
 
-  // Filtered documents
-  const filteredDocuments = documents.filter((doc) => {
-    const matchesSearch =
-      doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.originalName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || doc.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  const totalDocs = documents.length;
-  const readyDocs = documents.filter((d) => d.status === 'Ready').length;
-  const processingDocs = documents.filter((d) => d.status === 'Processing').length;
+  const totalDocs = stats.total;
+  const readyDocs = stats.ready;
+  const processingDocs = stats.processing;
 
   const formatFileSize = (bytes: number) => {
     if (!bytes) return '0 B';
@@ -138,35 +138,27 @@ export default function DashboardView({
     });
   };
 
-  // Get greeting time of day
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
-  };
-
   const isLibrary = view === 'documents';
-  const indexedChunks = documents.reduce((total, doc) => total + doc.chunkCount, 0);
-  const displayedDocuments = isLibrary ? filteredDocuments : documents.slice(0, 5);
+  const indexedChunks = useMemo(() => documents.reduce((total, doc) => total + doc.chunkCount, 0), [documents]);
+  const displayedDocuments = isLibrary ? documents : documents.slice(0, 5);
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#f8fafc] p-8 space-y-8 select-none">
-      {/* Top Welcome Header */}
+    <div className="app-view dashboard-view flex-1 overflow-y-auto bg-[#f8fafc] p-6 sm:p-8 space-y-8 select-none">
+      {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-            {isLibrary ? 'Document Library' : `${getGreeting()}, ${user?.name ? user.name.split(' ')[0] : 'Researcher'}`}
+            {isLibrary ? 'Document library' : 'Your documents'}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            {isLibrary ? 'Manage your PDFs and open a document-specific workspace.' : 'Search and understand your documents with grounded retrieval.'}
+            {isLibrary ? 'Manage your PDFs and open a document-specific workspace.' : 'Review recent files and continue a source-grounded conversation.'}
           </p>
         </div>
 
         <button
           id="dashboard_upload_cta"
           onClick={onOpenUpload}
-          className="inline-flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 shadow-sm transition-all cursor-pointer"
+          className="inline-flex items-center justify-center space-x-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-teal-700 hover:bg-teal-800 active:bg-teal-900 transition-colors cursor-pointer"
         >
           <UploadCloud className="h-4 w-4" />
           <span>Upload Document</span>
@@ -182,9 +174,9 @@ export default function DashboardView({
 
       {/* Metrics Row */}
       {!isLibrary && <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between">
+        <div className="p-5 rounded-xl bg-white border border-slate-200/80 flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <span className="text-xs font-medium text-slate-500">
               Total Documents
             </span>
             <div className="mt-1 text-2xl font-extrabold text-slate-900 font-mono">
@@ -197,9 +189,9 @@ export default function DashboardView({
           </div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between">
+        <div className="p-5 rounded-xl bg-white border border-slate-200/80 flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-teal-600">
+            <span className="text-xs font-medium text-teal-700">
               Ready for Q&A
             </span>
             <div className="mt-1 text-2xl font-extrabold text-teal-600 font-mono">
@@ -212,9 +204,9 @@ export default function DashboardView({
           </div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between">
+        <div className="p-5 rounded-xl bg-white border border-slate-200/80 flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <span className="text-xs font-medium text-slate-500">
               Processing
             </span>
             <div className="mt-1 text-2xl font-extrabold text-slate-700 font-mono">
@@ -226,15 +218,15 @@ export default function DashboardView({
             <Clock className="h-5 w-5" />
           </div>
         </div>
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div><span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Indexed Chunks</span><div className="mt-1 text-2xl font-extrabold text-slate-900 font-mono">{indexedChunks}</div><span className="text-xs text-slate-500 mt-1 block">Searchable passages</span></div>
+        <div className="p-5 rounded-xl bg-white border border-slate-200/80 flex items-center justify-between">
+          <div><span className="text-xs font-medium text-slate-500">Indexed passages</span><div className="mt-1 text-2xl font-extrabold text-slate-900 font-mono">{indexedChunks}</div><span className="text-xs text-slate-500 mt-1 block">Searchable passages</span></div>
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-50 text-teal-600 border border-teal-200/60"><Layers className="h-5 w-5" /></div>
         </div>
       </div>
       }
 
       {/* Search & Filter Toolbar */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200/80 overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/40">
           {!isLibrary && <div className="text-sm font-bold text-slate-900">Recent documents <span className="ml-2 text-xs font-normal text-slate-500">Your latest indexed files</span></div>}
           {/* Search Input */}
@@ -246,9 +238,9 @@ export default function DashboardView({
               id="document_search_input"
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search documents by title or filename..."
-              className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-900 bg-white placeholder:text-slate-400 focus:border-teal-500 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 transition-all"
+              onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+              placeholder="Search documents"
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-900 bg-white placeholder:text-slate-400 focus:border-teal-600 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 transition-colors"
             />
           </div>}
 
@@ -259,7 +251,7 @@ export default function DashboardView({
               <button
                 key={st}
                 id={`filter_tab_${st.toLowerCase()}`}
-                onClick={() => setStatusFilter(st)}
+                onClick={() => { setStatusFilter(st); setPage(1); }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   statusFilter === st
                     ? 'bg-teal-600 text-white shadow-xs'
@@ -312,7 +304,7 @@ export default function DashboardView({
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-mono font-semibold uppercase tracking-wider text-slate-600">
+                <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-mono font-medium text-slate-500">
                   <th className="py-3 px-6">Document</th>
                   <th className="py-3 px-4">Size & Pages</th>
                   <th className="py-3 px-4">Chunks</th>
@@ -436,6 +428,12 @@ export default function DashboardView({
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+        {isLibrary && !loading && pagination.totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
+            <span>Page {pagination.page} of {pagination.totalPages} · {pagination.total} documents</span>
+            <div className="flex gap-2"><button onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1} className="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-40">Previous</button><button onClick={() => setPage((current) => Math.min(pagination.totalPages, current + 1))} disabled={page === pagination.totalPages} className="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-40">Next</button></div>
           </div>
         )}
       </div>

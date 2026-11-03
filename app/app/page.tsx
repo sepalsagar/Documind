@@ -97,7 +97,7 @@ function AppContent() {
   };
 
   return (
-    <div className="h-screen w-screen flex overflow-hidden bg-[#f8fafc]">
+    <div className="app-shell h-screen w-screen flex overflow-hidden bg-[#f8fafc]">
       {/* App Sidebar */}
       <Sidebar
         currentView={currentView}

@@ -8,7 +8,7 @@ import {
   MessageSquare,
   Settings,
   LogOut,
-  Sparkles,
+  ScanSearch,
   Database,
   Cpu,
   ChevronRight,
@@ -59,14 +59,14 @@ export default function Sidebar({
   const sidebarContent = (
     <aside
       id="app_sidebar"
-      className="w-64 shrink-0 bg-slate-900 text-slate-200 border-r border-slate-800 flex flex-col justify-between h-screen select-none"
+      className="app-sidebar w-64 shrink-0 bg-slate-900 text-slate-200 border-r border-slate-800 flex flex-col justify-between h-screen select-none"
     >
       {/* Top section */}
       <div>
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800/80">
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => handleNavClick('dashboard')}>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-teal-700 text-white shadow-md shadow-teal-900/30 ring-1 ring-teal-400/30">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-700 text-white">
               <BrainCircuit className="h-5 w-5" />
             </div>
             <div className="flex items-center space-x-2">
@@ -99,8 +99,8 @@ export default function Sidebar({
                   <FileText className="h-3.5 w-3.5" />
                 </div>
                 <div className="overflow-hidden">
-                  <div className="text-[10px] font-medium text-teal-400 uppercase tracking-wider">
-                    Current Doc
+                  <div className="text-[10px] font-medium text-teal-400">
+                    Current document
                   </div>
                   <div className="text-xs font-semibold text-slate-100 truncate max-w-[130px]">
                     {selectedDocTitle || 'Untitled.pdf'}
@@ -114,8 +114,8 @@ export default function Sidebar({
 
         {/* Navigation Items */}
         <nav className="px-3 py-4 space-y-1">
-          <div className="px-3 pb-2 text-[11px] font-mono font-semibold uppercase tracking-wider text-slate-300">
-            Platform
+          <div className="px-3 pb-2 text-[11px] font-mono font-semibold text-slate-400">
+            Workspace
           </div>
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -157,13 +157,13 @@ export default function Sidebar({
         <div className="px-4 py-3 mx-3 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2 text-xs">
           <div className="flex items-center justify-between text-slate-300">
             <span className="flex items-center space-x-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-teal-400" />
-              <span className="font-semibold text-slate-300">RAG Engine</span>
+              <ScanSearch className="h-3.5 w-3.5 text-teal-400" />
+              <span className="font-semibold text-slate-300">Source retrieval</span>
             </span>
             <span className="font-mono text-[10px] text-teal-400">Grounded</span>
           </div>
-          <div className="text-[11px] text-slate-300 leading-relaxed">
-            Cosine Similarity vector search with Gemini generative citations.
+          <div className="text-[11px] text-slate-400 leading-relaxed">
+            Answers are based on the relevant indexed passages.
           </div>
         </div>
       </div>
@@ -175,7 +175,7 @@ export default function Sidebar({
             className="flex items-center space-x-3 cursor-pointer overflow-hidden"
             onClick={() => handleNavClick('settings')}
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-700 font-semibold text-sm text-teal-300 shadow-inner">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-800 border border-slate-700 font-semibold text-sm text-teal-300">
               {user?.name ? user.name.slice(0, 2).toUpperCase() : 'DM'}
             </div>
             <div className="overflow-hidden">

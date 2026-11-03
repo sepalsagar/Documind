@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
 import { getDocumentById, updateDocument, deleteDocument, getDocumentChunkCount } from '@/lib/store';
 import { elapsed, logTiming, serverTiming } from '@/lib/timing';
+import { invalidateCached } from '@/lib/query-cache';
 
 export async function GET(
   req: NextRequest,
@@ -69,6 +70,7 @@ export async function PATCH(
     if (!updated) {
       return NextResponse.json({ error: 'Document not found or access denied.' }, { status: 404 });
     }
+    invalidateCached(`document:${id}`);
 
     return NextResponse.json({
       success: true,
@@ -98,6 +100,8 @@ export async function DELETE(
     if (!success) {
       return NextResponse.json({ error: 'Document not found or access denied.' }, { status: 404 });
     }
+    invalidateCached(`chunks:${id}`);
+    invalidateCached(`document:${id}`);
 
     return NextResponse.json({
       success: true,

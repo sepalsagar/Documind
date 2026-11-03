@@ -59,7 +59,7 @@ export default function RegisterView({ onSwitchToLogin }: RegisterViewProps) {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#f8fafc] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 selection:bg-teal-500 selection:text-white">
+    <div className="auth-page register-page min-h-screen w-full bg-[#f8fafc] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 selection:bg-teal-500 selection:text-white">
       <div className="max-w-md w-full mx-auto bg-white rounded-3xl border border-slate-200/80 shadow-xl p-8 sm:p-10">
         {/* Brand Header */}
         <div className="flex items-center space-x-3 mb-6">

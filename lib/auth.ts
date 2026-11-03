@@ -4,9 +4,8 @@ import { NextRequest } from 'next/server';
 
 // This value must exist only in the server environment. Do not use a client
 // exposed NEXT_PUBLIC_ variable or a source-controlled fallback.
-const JWT_SECRET = process.env.JWT_SECRET;
-
 function jwtSecret(): string {
+  const JWT_SECRET = process.env.JWT_SECRET;
   if (!JWT_SECRET || JWT_SECRET === '<generate-a-strong-random-secret-here>') {
     throw new Error('JWT_SECRET must be configured with a strong secret.');
   }

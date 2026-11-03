@@ -197,7 +197,7 @@ async function runQA() {
     assert.ok(joined.includes('1.5 paid leave days') || joined.includes('leave'));
   });
 
-  await runAsync('Grounded answer generation with Gemini and citations', async () => {
+  await runAsync('Grounded answer generation with citations', async () => {
     const answerResult = await generateGroundedAnswer(validQuestion, retrievedForQ);
     assert.ok(answerResult.answer.length > 0);
     assert.ok(typeof answerResult.latencyMs === 'number');

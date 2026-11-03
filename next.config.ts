@@ -1,7 +1,14 @@
 import type {NextConfig} from 'next';
+import path from 'node:path';
 
 const nextConfig: NextConfig = {
+  // Keep Next's project boundary at this repository. A parent lockfile was
+  // causing it to select C:\\Users\\ASUS as the workspace root, which meant
+  // this app's .env.local was not reliably available to route handlers.
+  outputFileTracingRoot: path.join(__dirname),
   reactStrictMode: true,
+  compress: true,
+  poweredByHeader: false,
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -10,6 +17,7 @@ const nextConfig: NextConfig = {
   },
   // Allow access to remote image placeholder.
   images: {
+    formats: ['image/avif', 'image/webp'],
     remotePatterns: [
       {
         protocol: 'https',
@@ -19,10 +27,16 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async headers() {
+    return [{
+      source: '/:path*.(svg|png|jpg|jpeg|webp|avif|woff2)',
+      headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+    }];
+  },
   output: 'standalone',
   transpilePackages: ['motion'],
   webpack: (config, {dev}) => {
-    // HMR is disabled in AI Studio via DISABLE_HMR env var.
+    // HMR can be disabled in constrained environments via DISABLE_HMR.
     // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
     if (dev && process.env.DISABLE_HMR === 'true') {
       config.watchOptions = {

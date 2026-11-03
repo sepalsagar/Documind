@@ -2,6 +2,5 @@
   "name": "DocuMind",
   "description": "Intelligent AI document assistant with semantic RAG retrieval, vector search, and source-grounded answers.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GROUNDED_ANSWERING"]
 }
-

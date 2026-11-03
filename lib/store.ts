@@ -472,6 +472,45 @@ export async function getUserDocuments(
   return list;
 }
 
+export async function getUserDocumentsPage(
+  userId: string,
+  filter: { search?: string; status?: string },
+  page = 1,
+  pageSize = 25
+): Promise<{ documents: MemoryDocument[]; total: number; stats: { total: number; ready: number; processing: number; failed: number } }> {
+  const safePage = Math.max(1, page);
+  const safePageSize = Math.min(100, Math.max(1, pageSize));
+  const db = await connectToDatabase();
+  const query: Record<string, unknown> = { userId };
+  if (filter.status && filter.status !== 'All') query.status = filter.status;
+  if (filter.search) query.title = { $regex: filter.search, $options: 'i' };
+
+  if (db) {
+    try {
+      const [result] = await DocumentModel.aggregate([
+        { $match: query },
+        { $facet: {
+          documents: [{ $sort: { createdAt: -1 } }, { $skip: (safePage - 1) * safePageSize }, { $limit: safePageSize }],
+          total: [{ $count: 'count' }],
+          statuses: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+        } },
+      ]);
+      const statuses = Object.fromEntries((result.statuses || []).map((item: { _id: string; count: number }) => [item._id, item.count]));
+      return {
+        documents: (result.documents || []).map((doc: any) => ({ ...doc, _id: doc._id.toString() })),
+        total: result.total?.[0]?.count || 0,
+        stats: { total: result.total?.[0]?.count || 0, ready: statuses.Ready || 0, processing: statuses.Processing || 0, failed: statuses.Failed || 0 },
+      };
+    } catch (error) {
+      if (isProductionEnvironment()) throw error;
+    }
+  }
+
+  const all = await getUserDocuments(userId, filter);
+  const stats = { total: all.length, ready: all.filter((doc) => doc.status === 'Ready').length, processing: all.filter((doc) => doc.status === 'Processing').length, failed: all.filter((doc) => doc.status === 'Failed').length };
+  return { documents: all.slice((safePage - 1) * safePageSize, safePage * safePageSize), total: all.length, stats };
+}
+
 export async function getDocumentById(id: string, userId: string): Promise<MemoryDocument | null> {
   const db = await connectToDatabase();
 

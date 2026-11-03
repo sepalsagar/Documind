@@ -317,7 +317,7 @@ export default function WorkspaceView({
   const maxBucket = Math.max(1, ...chartBuckets);
 
   return (
-    <div className="flex-1 flex flex-col h-screen overflow-hidden bg-[#f8fafc]">
+    <div className="app-view workspace-view flex-1 flex flex-col h-screen overflow-hidden bg-[#f8fafc]">
       {/* Top Workspace Header */}
       <div className="h-16 shrink-0 bg-white border-b border-slate-200/80 px-6 flex items-center justify-between z-20 shadow-xs">
         <div className="flex items-center space-x-3 overflow-hidden">
@@ -801,7 +801,7 @@ export default function WorkspaceView({
             </div>
             <div className="flex justify-between text-[10px]">
               <span>Model Provider:</span>
-              <span className="text-teal-700 font-semibold">Google Gemini 3.8</span>
+              <span className="text-teal-700 font-semibold">Grounded answer engine</span>
             </div>
           </div>
         </div>

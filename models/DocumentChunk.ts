@@ -30,6 +30,8 @@ const DocumentChunkSchema = new Schema<IDocumentChunk>(
     timestamps: true,
   }
 );
+DocumentChunkSchema.index({ documentId: 1, chunkIndex: 1 }, { unique: true });
+DocumentChunkSchema.index({ documentId: 1, pageNumber: 1 });
 
 export const DocumentChunkModel =
   mongoose.models.DocumentChunk ||

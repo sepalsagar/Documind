@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
 import { getDocumentById, getDocumentChunks } from '@/lib/store';
 import { elapsed, logTiming, serverTiming } from '@/lib/timing';
+import { cached } from '@/lib/query-cache';
 
 export async function GET(
   req: NextRequest,
@@ -21,7 +22,7 @@ export async function GET(
       return NextResponse.json({ error: 'Document not found or access denied.' }, { status: 404 });
     }
 
-    const chunks = await getDocumentChunks(id);
+    const chunks = await cached(`chunks:${id}`, 60_000, () => getDocumentChunks(id));
 
     // Return lightweight chunk metadata for visualization
     const chunkMetadata = chunks.slice(0, 20).map((c) => ({
@@ -39,6 +40,7 @@ export async function GET(
     });
     const timings = { total: elapsed(started) };
     response.headers.set('Server-Timing', serverTiming(timings));
+    response.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
     logTiming('/api/documents/:id/chunks', timings);
     return response;
   } catch (error: any) {

@@ -45,7 +45,7 @@ export default function SettingsView() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#f8fafc] p-8 select-none">
+    <div className="app-view settings-view flex-1 overflow-y-auto bg-[#f8fafc] p-8 select-none">
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Header */}
         <div>
@@ -213,7 +213,7 @@ export default function SettingsView() {
                     <option value="5">Top 5 Chunks (Comprehensive)</option>
                   </select>
                   <p className="text-[11px] text-slate-500">
-                    Number of highest scoring passages provided to Gemini.
+                    Number of highest-scoring passages provided to the answer model.
                   </p>
                 </div>
 
@@ -255,13 +255,13 @@ export default function SettingsView() {
               <p>
                 DocuMind is an AI Document Assistant designed for document-grounded retrieval and
                 evidence-backed Q&A. Built with Next.js, React, Tailwind CSS,
-                MongoDB, and Google Gemini.
+                MongoDB and the configured answer provider.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
                   <div className="font-semibold text-slate-900 mb-1">RAG Pipeline</div>
-                  <div>PDF Parse → Window Chunking → Vector Embeddings → Cosine Similarity → Grounded Gemini Generation.</div>
+                  <div>PDF parse → window chunking → local vectors → cosine similarity → grounded generation.</div>
                 </div>
                 <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
                   <div className="font-semibold text-slate-900 mb-1">Security & Isolation</div>

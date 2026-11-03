@@ -59,7 +59,7 @@ export default function LoginView({ onSwitchToRegister }: LoginViewProps) {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#f8fafc] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 selection:bg-teal-500 selection:text-white">
+    <div className="auth-page login-page min-h-screen w-full bg-[#f8fafc] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 selection:bg-teal-500 selection:text-white">
       <div className="max-w-6xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
         {/* Left Column: Form */}
         <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200/80 shadow-xl p-8 sm:p-10">
@@ -253,7 +253,7 @@ export default function LoginView({ onSwitchToRegister }: LoginViewProps) {
                 <div className="flex items-center justify-between text-xs font-mono text-teal-400">
                   <div className="flex items-center space-x-1.5">
                     <Sparkles className="h-3.5 w-3.5" />
-                    <span>Grounded Answer (Gemini)</span>
+                    <span>Grounded answer with citations</span>
                   </div>
                   <span className="bg-teal-900/80 px-2 py-0.5 rounded text-[10px] text-teal-300 border border-teal-700">
                     Cosine Sim: 0.942

@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (error) {
     console.error('Demo creation error:', error);
-    return NextResponse.json({ error: 'The demo is temporarily unavailable. Please try again or create an account.' }, { status: 503 });
+    const detail = process.env.NODE_ENV === 'development' && error instanceof Error ? ` (${error.message})` : '';
+    return NextResponse.json({ error: `The demo is temporarily unavailable. Please try again or create an account.${detail}` }, { status: 503 });
   }
 }

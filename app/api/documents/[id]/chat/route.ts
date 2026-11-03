@@ -4,6 +4,7 @@ import { getDocumentById, getDocumentChunks, getOrCreateConversation, createConv
 import { generateEmbedding, retrieveTopK, streamGroundedAnswer } from '@/lib/rag';
 import { consumeRateLimit } from '@/lib/rate-limit';
 import { elapsed, logTiming, serverTiming } from '@/lib/timing';
+import { invalidateCached } from '@/lib/query-cache';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -98,6 +99,7 @@ export async function POST(
       const conversation = await getOrCreateConversation(authUser.userId, id, expiresAt);
       await createConversationMessage({ conversationId: conversation._id, userId: authUser.userId, documentId: id, role: 'user', content: question.trim(), expiresAt });
       await createConversationMessage({ conversationId: conversation._id, userId: authUser.userId, documentId: id, role: 'assistant', content: 'The document does not contain enough relevant information to answer this question confidently.', expiresAt });
+      invalidateCached(`conversation:${conversation._id}`);
       const response = NextResponse.json({
         question: question.trim(),
         answer: 'The document does not contain enough relevant information to answer this question confidently.',
@@ -112,7 +114,7 @@ export async function POST(
       return response;
     }
 
-    // 4. Grounded AI Generation with Gemini
+    // 4. Grounded generation with the configured provider
     // Format sources with actual chunks
     const sources = retrievedChunks.map((c, index) => ({
       sourceId: index + 1,
@@ -166,6 +168,7 @@ export async function POST(
               sources: sources.map((source) => ({ page: source.pageNumber, chunkId: String(source.chunkIndex), score: source.similarity })),
               expiresAt,
             });
+            invalidateCached(`conversation:${conversation._id}`);
           } catch (persistenceError) {
             console.error('Chat history persistence error:', persistenceError);
           }

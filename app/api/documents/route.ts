@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
-import { getUserDocuments, createDocument, createDocumentChunks, updateDocument } from '@/lib/store';
+import { getUserDocumentsPage, createDocument, createDocumentChunks, updateDocument } from '@/lib/store';
 import { generateEmbedding } from '@/lib/rag';
 import { elapsed, logTiming, serverTiming } from '@/lib/timing';
 
@@ -16,35 +16,30 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') || undefined;
     const status = searchParams.get('status') || undefined;
+    const page = Number(searchParams.get('page') || '1');
+    const pageSize = Number(searchParams.get('pageSize') || '25');
 
     const listStarted = performance.now();
-    let docs = await getUserDocuments(authUser.userId, { search, status });
+    let result = await getUserDocumentsPage(authUser.userId, { search, status }, page, pageSize);
+    let docs = result.documents;
     timings.list = elapsed(listStarted);
 
     // Seed default sample documents if this is the first time the user accesses the library
-    if (docs.length === 0 && !search && (!status || status === 'All')) {
+    if (result.total === 0 && !search && (!status || status === 'All')) {
       const hasChecked = req.cookies.get('documind_seeded_' + authUser.userId);
       if (!hasChecked) {
         // Seed initial sample documents so the user can test the RAG immediately
         await seedSampleDocuments(authUser.userId);
-        docs = await getUserDocuments(authUser.userId, { search, status });
+        result = await getUserDocumentsPage(authUser.userId, { search, status }, page, pageSize);
+        docs = result.documents;
       }
     }
 
     // Compute summary stats
-    const totalDocs = docs.length;
-    const readyDocs = docs.filter((d) => d.status === 'Ready').length;
-    const processingDocs = docs.filter((d) => d.status === 'Processing').length;
-    const failedDocs = docs.filter((d) => d.status === 'Failed').length;
-
     const response = NextResponse.json({
       documents: docs,
-      stats: {
-        total: totalDocs,
-        ready: readyDocs,
-        processing: processingDocs,
-        failed: failedDocs,
-      },
+      stats: result.stats,
+      pagination: { page: Math.max(1, page), pageSize: Math.min(100, Math.max(1, pageSize)), total: result.total, totalPages: Math.max(1, Math.ceil(result.total / Math.min(100, Math.max(1, pageSize)))) },
     });
 
     if (!req.cookies.get('documind_seeded_' + authUser.userId)) {
@@ -53,6 +48,7 @@ export async function GET(req: NextRequest) {
 
     timings.total = elapsed(started);
     response.headers.set('Server-Timing', serverTiming(timings));
+    response.headers.set('Cache-Control', 'private, max-age=0, must-revalidate');
     logTiming('/api/documents', timings);
     return response;
   } catch (error: any) {

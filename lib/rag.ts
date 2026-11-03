@@ -1,18 +1,11 @@
-import { GoogleGenAI } from '@google/genai';
 import { extractText } from 'unpdf';
-
-// Initialize Gemini Client
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    },
-  },
-});
 
 const EMBEDDING_TIMEOUT_MS = 15_000;
 const ANSWER_TIMEOUT_MS = 30_000;
+const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').replace(/\/$/, '');
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:3b';
+const OPENROUTER_BASE_URL = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-oss-20b:free';
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
   return Promise.race([
@@ -142,7 +135,7 @@ export function chunkDocument(
 }
 
 /**
- * 3. Embedding Generation via Gemini / Semantic Vector Model
+ * 3. Embedding Generation via hosted provider / semantic vector model
  */
 export type EmbeddingTask = 'RETRIEVAL_DOCUMENT' | 'RETRIEVAL_QUERY';
 
@@ -155,30 +148,6 @@ export async function generateEmbeddings(
   texts: string[],
   taskType: EmbeddingTask = 'RETRIEVAL_DOCUMENT'
 ): Promise<number[][]> {
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  if (apiKey && apiKey !== 'MY_GEMINI_API_KEY' && apiKey !== 'YOUR_GEMINI_API_KEY') {
-    try {
-      const response: any = await withTimeout(ai.models.embedContent({
-        model: 'gemini-embedding-2-preview',
-        contents: texts,
-        config: { taskType },
-      }), EMBEDDING_TIMEOUT_MS, 'Embedding request timed out.');
-
-      const values = response.embeddings
-        ?.map((embedding: any) => embedding?.values)
-        .filter((embedding: any) => Array.isArray(embedding) && embedding.length > 0);
-      if (values?.length === texts.length) {
-        return values;
-      }
-      if (texts.length === 1 && response.embedding?.values?.length > 0) {
-        return [response.embedding.values];
-      }
-    } catch (err: any) {
-      console.warn('Gemini embedding API fallback to semantic vector:', err?.message);
-    }
-  }
-
   return texts.map((text) => computeDeterministicVector(text, 128));
 }
 
@@ -225,7 +194,7 @@ function computeDeterministicVector(text: string, dimensions = 128): number[] {
  */
 export function cosineSimilarity(vecA: number[], vecB: number[]): number {
   // Cosine similarity is meaningful only inside one vector space. Never
-  // truncate vectors to the shortest length: that can make a Gemini vector
+  // truncate vectors to the shortest length: that can make incompatible vectors
   // appear comparable to the 128-D offline fallback.
   if (!vecA || !vecB || vecA.length === 0 || vecB.length === 0 || vecA.length !== vecB.length) return 0;
 
@@ -272,7 +241,7 @@ export function retrieveTopK(
 }
 
 /**
- * 6. Grounded Answer Generation using Gemini
+ * 6. Grounded Answer Generation using the configured provider
  */
 export async function generateGroundedAnswer(
   question: string,
@@ -301,47 +270,20 @@ ${question}
 
 GROUNDED ANSWER (with citations):`;
 
-  try {
-    const response = await withTimeout(ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: prompt,
-      config: {
-        systemInstruction,
-        temperature: 0.1, // low temperature for deterministic factuality
-      },
-    }), ANSWER_TIMEOUT_MS, 'Answer generation timed out.');
-
-    // Keep citation identifiers in the answer within the deterministic source
-    // list returned by the route.  A model-generated [4] cannot point to a
-    // source when only three passages were retrieved.
-    const answer = (response.text || 'I could not find sufficient information in the provided document context.')
-      .replace(/\[(\d+)\]/g, (match, value) => {
+  const answer = await requestOpenRouter(prompt, systemInstruction);
+  if (answer) {
+    return {
+      answer: answer.replace(/\[(\d+)\]/g, (match, value) => {
         const sourceNumber = Number(value);
         return sourceNumber >= 1 && sourceNumber <= retrievedChunks.length ? match : '';
-      });
-    const latencyMs = Date.now() - startTime;
-
-    return {
-      answer,
-      latencyMs,
-    };
-  } catch (err: any) {
-    console.warn('Gemini API call failed, generating contextual fallback:', err?.message);
-    const latencyMs = Date.now() - startTime;
-    // Contextual grounded synthesis fallback
-    if (retrievedChunks.length === 0) {
-      return {
-        answer: 'The document does not contain enough information to answer this question.',
-        latencyMs,
-      };
-    }
-
-    const firstChunk = retrievedChunks[0];
-    return {
-      answer: `Based on the document context [1]: "${firstChunk.text.slice(0, 200)}..."`,
-      latencyMs,
+      }),
+      latencyMs: Date.now() - startTime,
     };
   }
+  return {
+    answer: buildFallbackAnswer(retrievedChunks),
+    latencyMs: Date.now() - startTime,
+  };
 }
 
 export async function streamGroundedAnswer(
@@ -356,25 +298,128 @@ export async function streamGroundedAnswer(
   const prompt = `DOCUMENT CONTEXT:\n${contextFormatted}\n\nUSER QUESTION:\n${question}\n\nGROUNDED ANSWER (with citations):`;
   const systemInstruction = `You are DocuMind, an AI Document Assistant. Answer using ONLY the provided document context. If the answer cannot be determined, say so. Cite facts with [1], [2], or [3].`;
 
-  if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'MY_GEMINI_API_KEY' || process.env.GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY') {
-    onText(buildFallbackAnswer(retrievedChunks));
-    return Date.now() - startTime;
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  if (openRouterKey) {
+    try {
+      const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${openRouterKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': process.env.APP_URL || 'https://documind-zeta-fawn.vercel.app',
+          'X-Title': 'DocuMind',
+        },
+        body: JSON.stringify({
+          model: OPENROUTER_MODEL,
+          stream: true,
+          temperature: 0.1,
+          messages: [
+            { role: 'system', content: systemInstruction },
+            { role: 'user', content: prompt },
+          ],
+        }),
+        signal: AbortSignal.timeout(ANSWER_TIMEOUT_MS),
+      });
+      if (!response.ok || !response.body) throw new Error(`OpenRouter returned ${response.status}`);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+          const event = JSON.parse(line.slice(6)) as { choices?: Array<{ delta?: { content?: string } }> };
+          const text = event.choices?.[0]?.delta?.content;
+          if (text) onText(text);
+        }
+        if (done) break;
+      }
+      return Date.now() - startTime;
+    } catch (error: any) {
+      console.warn('OpenRouter streaming failed; trying Ollama:', error?.message);
+    }
   }
 
   try {
-    const stream = await withTimeout(ai.models.generateContentStream({
-      model: 'gemini-3.8-flash',
-      contents: prompt,
-      config: { systemInstruction, temperature: 0.1 },
-    }), ANSWER_TIMEOUT_MS, 'Answer generation timed out.');
-    for await (const response of stream) {
-      if (response.text) onText(response.text);
+    const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        stream: true,
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: prompt },
+        ],
+        options: { temperature: 0.1 },
+      }),
+      signal: AbortSignal.timeout(ANSWER_TIMEOUT_MS),
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error(`Ollama returned ${response.status}`);
     }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const event = JSON.parse(line) as { message?: { content?: string }; done?: boolean };
+        if (event.message?.content) onText(event.message.content);
+      }
+      if (done) break;
+    }
+    if (buffer.trim()) {
+      const event = JSON.parse(buffer) as { message?: { content?: string } };
+      if (event.message?.content) onText(event.message.content);
+    }
+    return Date.now() - startTime;
   } catch (error: any) {
-    console.warn('Gemini streaming failed, using contextual fallback:', error?.message);
+    console.warn('Ollama unavailable; using grounded passage fallback:', error?.message);
     onText(buildFallbackAnswer(retrievedChunks));
   }
+
   return Date.now() - startTime;
+}
+
+async function requestOpenRouter(prompt: string, systemInstruction: string): Promise<string | null> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.APP_URL || 'https://documind-zeta-fawn.vercel.app',
+        'X-Title': 'DocuMind',
+      },
+      body: JSON.stringify({
+        model: OPENROUTER_MODEL,
+        temperature: 0.1,
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: prompt },
+        ],
+      }),
+      signal: AbortSignal.timeout(ANSWER_TIMEOUT_MS),
+    });
+    if (!response.ok) throw new Error(`OpenRouter returned ${response.status}`);
+    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+    return data.choices?.[0]?.message?.content || null;
+  } catch (error: any) {
+    console.warn('OpenRouter answer generation failed:', error?.message);
+    return null;
+  }
 }
 
 export function buildFallbackAnswer(retrievedChunks: RetrievedChunk[]): string {

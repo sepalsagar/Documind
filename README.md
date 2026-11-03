@@ -23,9 +23,9 @@ passages and page numbers behind each answer.
   status without returning secrets.
 - Uploads are limited to 10 MB and 100 pages and must contain a PDF header.
 - Scanned/image-only PDFs are not OCR'd yet; upload an OCR'd or text-based PDF.
-- Gemini is used when `GEMINI_API_KEY` is configured. Local deterministic
-  embeddings and a grounded excerpt fallback keep development/test flows
-  usable without the API, but are not a substitute for production AI quality.
+- OpenRouter is used when `OPENROUTER_API_KEY` is configured. Local deterministic
+  embeddings, Ollama support, and a grounded excerpt fallback keep development/test
+  flows usable without a hosted provider.
 
 The app does not currently store uploaded PDF binaries, perform OCR, or provide
 multi-user document sharing.
@@ -41,7 +41,7 @@ demo data expires after 24 hours.
 
 1. Install dependencies:
    `npm install`
-2. Copy `.env.example` to `.env.local`, then set `GEMINI_API_KEY` and a strong server-only `JWT_SECRET` (for example, `openssl rand -base64 48`). Do not commit `.env.local`.
+2. Copy `.env.example` to `.env.local`, then set `OPENROUTER_API_KEY` and a strong server-only `JWT_SECRET` (for example, `openssl rand -base64 48`). Do not commit `.env.local`.
 3. Run the app:
    `npm run dev`
 
@@ -72,6 +72,25 @@ Try the demo from the landing page without signing up.
 
 The existing end-to-end QA script is available as `npm run qa` and requires a
 configured `JWT_SECRET`.
+
+## AI provider without hosted API limits
+
+There is no legitimate hosted provider that offers unlimited high-quality
+generation at no cost. For unlimited local use, install [Ollama](https://ollama.com/)
+and run a local model such as `qwen2.5:3b`, `qwen2.5:7b`, or `llama3.2`; local requests are limited
+only by your machine. DocuMind remains usable without a hosted model key
+through its deterministic embedding and grounded-excerpt fallback. Ollama can be
+added as the generation and embedding provider later without changing the upload,
+retrieval, citation, or MongoDB setup; do not expose an Ollama endpoint publicly
+without authentication and rate limiting.
+
+## Copilot UI refinement
+
+This repository includes a workspace-local `/unslop` skill for screenshot-driven
+frontend audits and focused visual refinement. In VS Code Copilot Chat, run
+`/unslop landing page` (or name another route/screen) to inspect the UI, propose a
+DocuMind-specific visual direction, apply safe polish passes, and validate with the
+existing lint, test, and screenshot commands.
 
 ## Production (standalone)
 
