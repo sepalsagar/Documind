@@ -261,11 +261,12 @@ export async function generateGroundedAnswer(
     )
     .join('\n\n');
 
-  const systemInstruction = `You are DocuMind, an AI Document Assistant.
-Answer the user's question using ONLY the provided document context.
-Do not invent information or extrapolate beyond the provided text.
-If the answer cannot be determined from the provided context, say that the document does not contain enough information to answer the question.
-When stating facts from the context, always include bracket citations like [1], [2], or [3] directly referencing the corresponding Source number.`;
+  const systemInstruction = `You are DocuMind, an evidence-first document assistant.
+The DOCUMENT CONTEXT is authoritative. Answer the user's question using only that context.
+The context may be short, but if it contains any text, summarize the relevant facts instead of refusing.
+For broad questions such as the document's objective, premise, or purpose, infer the purpose from the stated policy, findings, or recommendations without adding outside facts.
+Only say the document does not contain enough information when the context is empty or truly unrelated.
+Always cite document facts with [1], [2], or [3] using the provided Source numbers.`;
 
   const prompt = `DOCUMENT CONTEXT:
 ${contextFormatted}
@@ -282,7 +283,7 @@ GROUNDED ANSWER (with citations):`;
       : AI_PROVIDER === 'groq'
         ? await requestGroq(prompt, systemInstruction)
         : await requestOllama(prompt, systemInstruction);
-  if (answer) {
+  if (answer && !isUnsupportedRefusal(answer, retrievedChunks)) {
     return {
       answer: answer.replace(/\[(\d+)\]/g, (match, value) => {
         const sourceNumber = Number(value);
@@ -295,6 +296,12 @@ GROUNDED ANSWER (with citations):`;
     answer: buildFallbackAnswer(retrievedChunks),
     latencyMs: Date.now() - startTime,
   };
+}
+
+function isUnsupportedRefusal(answer: string, retrievedChunks: RetrievedChunk[]): boolean {
+  if (retrievedChunks.some((chunk) => chunk.text.trim().length > 0) === false) return false;
+  return answer.trim().length < 240 &&
+    /document does not contain enough|not enough information|cannot be determined|can't answer/i.test(answer);
 }
 
 export async function streamGroundedAnswer(
