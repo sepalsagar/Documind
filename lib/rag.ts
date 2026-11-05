@@ -2,8 +2,13 @@ import { extractText } from 'unpdf';
 
 const EMBEDDING_TIMEOUT_MS = 15_000;
 const ANSWER_TIMEOUT_MS = 30_000;
+const AI_PROVIDER = process.env.AI_PROVIDER || 'ollama';
 const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').replace(/\/$/, '');
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:3b';
+const GROQ_BASE_URL = (process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1').replace(/\/$/, '');
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
+const PUTER_BASE_URL = (process.env.PUTER_BASE_URL || 'https://api.puter.com/puterai/openai/v1').replace(/\/$/, '');
+const PUTER_MODEL = process.env.PUTER_MODEL || 'gemini:gemini-3.8-flash';
 const OPENROUTER_BASE_URL = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-oss-20b:free';
 
@@ -270,7 +275,13 @@ ${question}
 
 GROUNDED ANSWER (with citations):`;
 
-  const answer = await requestOpenRouter(prompt, systemInstruction);
+  const answer = AI_PROVIDER === 'puter'
+    ? await requestPuter(prompt, systemInstruction)
+    : AI_PROVIDER === 'openrouter'
+      ? await requestOpenRouter(prompt, systemInstruction)
+      : AI_PROVIDER === 'groq'
+        ? await requestGroq(prompt, systemInstruction)
+        : await requestOllama(prompt, systemInstruction);
   if (answer) {
     return {
       answer: answer.replace(/\[(\d+)\]/g, (match, value) => {
@@ -298,8 +309,51 @@ export async function streamGroundedAnswer(
   const prompt = `DOCUMENT CONTEXT:\n${contextFormatted}\n\nUSER QUESTION:\n${question}\n\nGROUNDED ANSWER (with citations):`;
   const systemInstruction = `You are DocuMind, an AI Document Assistant. Answer using ONLY the provided document context. If the answer cannot be determined, say so. Cite facts with [1], [2], or [3].`;
 
+  const puterToken = process.env.PUTER_AUTH_TOKEN;
+  if (AI_PROVIDER === 'puter' && puterToken) {
+    try {
+      const response = await fetch(`${PUTER_BASE_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${puterToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: PUTER_MODEL,
+          stream: true,
+          temperature: 0.1,
+          messages: [
+            { role: 'system', content: systemInstruction },
+            { role: 'user', content: prompt },
+          ],
+        }),
+        signal: AbortSignal.timeout(ANSWER_TIMEOUT_MS),
+      });
+      if (!response.ok || !response.body) throw new Error(`Puter returned ${response.status}`);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+          const event = JSON.parse(line.slice(6)) as { choices?: Array<{ delta?: { content?: string } }> };
+          const text = event.choices?.[0]?.delta?.content;
+          if (text) onText(text);
+        }
+        if (done) break;
+      }
+      return Date.now() - startTime;
+    } catch (error: any) {
+      console.warn('Puter streaming failed; trying OpenRouter and Ollama:', error?.message);
+    }
+  }
+
   const openRouterKey = process.env.OPENROUTER_API_KEY;
-  if (openRouterKey) {
+  if (AI_PROVIDER === 'openrouter' && openRouterKey) {
     try {
       const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
         method: 'POST',
@@ -340,6 +394,50 @@ export async function streamGroundedAnswer(
       return Date.now() - startTime;
     } catch (error: any) {
       console.warn('OpenRouter streaming failed; trying Ollama:', error?.message);
+    }
+  }
+
+  const groqKey = process.env.GROQ_API_KEY;
+  if (AI_PROVIDER === 'groq' && groqKey) {
+    try {
+      const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${groqKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          stream: true,
+          temperature: 0.1,
+          max_tokens: 1200,
+          messages: [
+            { role: 'system', content: systemInstruction },
+            { role: 'user', content: prompt },
+          ],
+        }),
+        signal: AbortSignal.timeout(ANSWER_TIMEOUT_MS),
+      });
+      if (!response.ok || !response.body) throw new Error(`Groq returned ${response.status}`);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+          const event = JSON.parse(line.slice(6)) as { choices?: Array<{ delta?: { content?: string } }> };
+          const text = event.choices?.[0]?.delta?.content;
+          if (text) onText(text);
+        }
+        if (done) break;
+      }
+      return Date.now() - startTime;
+    } catch (error: any) {
+      console.warn('Groq streaming failed; using Ollama fallback:', error?.message);
     }
   }
 
@@ -420,6 +518,93 @@ async function requestOpenRouter(prompt: string, systemInstruction: string): Pro
     console.warn('OpenRouter answer generation failed:', error?.message);
     return null;
   }
+}
+
+async function requestPuter(prompt: string, systemInstruction: string): Promise<string | null> {
+  const token = process.env.PUTER_AUTH_TOKEN;
+  if (!token) return null;
+  try {
+    const response = await fetch(`${PUTER_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: PUTER_MODEL,
+        temperature: 0.1,
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: prompt },
+        ],
+      }),
+      signal: AbortSignal.timeout(ANSWER_TIMEOUT_MS),
+    });
+    if (!response.ok) throw new Error(`Puter returned ${response.status}`);
+    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+    return data.choices?.[0]?.message?.content || null;
+  } catch (error: any) {
+    console.warn('Puter answer generation failed:', error?.message);
+    return null;
+  }
+
+}
+
+async function requestGroq(prompt: string, systemInstruction: string): Promise<string | null> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        temperature: 0.1,
+        max_tokens: 1200,
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: prompt },
+        ],
+      }),
+      signal: AbortSignal.timeout(ANSWER_TIMEOUT_MS),
+    });
+    if (!response.ok) throw new Error(`Groq returned ${response.status}`);
+    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+    return data.choices?.[0]?.message?.content || null;
+  } catch (error: any) {
+    console.warn('Groq answer generation failed:', error?.message);
+    return null;
+  }
+}
+
+async function requestOllama(prompt: string, systemInstruction: string): Promise<string | null> {
+  try {
+    const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        stream: false,
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: prompt },
+        ],
+        options: { temperature: 0.1 },
+      }),
+      signal: AbortSignal.timeout(ANSWER_TIMEOUT_MS),
+    });
+    if (!response.ok) throw new Error(`Ollama returned ${response.status}`);
+    const data = await response.json() as { message?: { content?: string } };
+    return data.message?.content || null;
+  } catch (error: any) {
+    console.warn('Ollama answer generation failed:', error?.message);
+    return null;
+  }
+
+
 }
 
 export function buildFallbackAnswer(retrievedChunks: RetrievedChunk[]): string {

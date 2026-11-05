@@ -1,6 +1,3 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
 
 # DocuMind
 
@@ -23,9 +20,19 @@ passages and page numbers behind each answer.
   status without returning secrets.
 - Uploads are limited to 10 MB and 100 pages and must contain a PDF header.
 - Scanned/image-only PDFs are not OCR'd yet; upload an OCR'd or text-based PDF.
-- OpenRouter is used when `OPENROUTER_API_KEY` is configured. Local deterministic
-  embeddings, Ollama support, and a grounded excerpt fallback keep development/test
-  flows usable without a hosted provider.
+- Puter is used when `PUTER_AUTH_TOKEN` is configured through its
+  OpenAI-compatible endpoint. OpenRouter and Ollama remain supported fallbacks.
+  Local deterministic embeddings and a grounded excerpt fallback keep development
+  and test flows usable without a hosted provider.
+
+For unlimited local generation, set `AI_PROVIDER=ollama` and use an installed
+model such as `OLLAMA_MODEL=llama3.2:latest`. Ollama must be running locally at
+`OLLAMA_BASE_URL`; it is not available from a deployed Vercel server unless you
+expose a secured remote Ollama service.
+
+For Vercel production, set `AI_PROVIDER=groq`, `GROQ_API_KEY`, and
+`GROQ_MODEL=openai/gpt-oss-20b`. Groq is hosted and fast, but its free tier has
+request and token limits.
 
 The app does not currently store uploaded PDF binaries, perform OCR, or provide
 multi-user document sharing.
@@ -41,7 +48,10 @@ demo data expires after 24 hours.
 
 1. Install dependencies:
    `npm install`
-2. Copy `.env.example` to `.env.local`, then set `OPENROUTER_API_KEY` and a strong server-only `JWT_SECRET` (for example, `openssl rand -base64 48`). Do not commit `.env.local`.
+2. Copy `.env.example` to `.env.local`, then set `PUTER_AUTH_TOKEN` and a strong
+   server-only `JWT_SECRET` (for example, `openssl rand -base64 48`). The default
+   Puter model is `gemini:gemini-3.8-flash`. Do not
+   commit `.env.local`.
 3. Run the app:
    `npm run dev`
 
