@@ -87,13 +87,26 @@ export async function POST(
     // 3. Perform Cosine Similarity Semantic Retrieval
     const k = Math.min(Math.max(1, topK), 5);
     const searchStarted = performance.now();
-    const retrievedChunks = retrieveTopK(queryEmbedding, chunks, k)
+    let retrievedChunks = retrieveTopK(queryEmbedding, chunks, k)
       .filter((chunk) => Number.isInteger(chunk.pageNumber) && chunk.pageNumber >= 1 && chunk.pageNumber <= doc.pageCount);
     timings.vectorSearch = elapsed(searchStarted);
 
-    // The top result is still useful context for short and single-chunk
-    // documents, where hash-based local embeddings can produce a low score.
-    // The model receives the passage and must still answer only from it.
+    // Older documents may contain embeddings from a different vector model.
+    // Preserve answerability by passing their page-valid text to the grounded
+    // model instead of treating an embedding shape mismatch as no evidence.
+    if (retrievedChunks.length === 0) {
+      retrievedChunks = chunks
+        .filter((chunk) => Number.isInteger(chunk.pageNumber) && chunk.pageNumber >= 1 && chunk.pageNumber <= doc.pageCount)
+        .slice(0, k)
+        .map((chunk) => ({
+          chunkIndex: chunk.chunkIndex,
+          pageNumber: chunk.pageNumber,
+          text: chunk.text,
+          tokenCount: chunk.tokenCount || Math.round(chunk.text.split(' ').length * 1.3),
+          similarity: 0,
+        }));
+    }
+
     if (retrievedChunks.length === 0) {
       const expiresAt = authUser.isDemo && authUser.expiresAt ? new Date(authUser.expiresAt) : undefined;
       const conversation = await getOrCreateConversation(authUser.userId, id, expiresAt);
