@@ -400,44 +400,12 @@ export async function streamGroundedAnswer(
   const groqKey = process.env.GROQ_API_KEY;
   if (AI_PROVIDER === 'groq' && groqKey) {
     try {
-      const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${groqKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: GROQ_MODEL,
-          stream: true,
-          temperature: 0.1,
-          max_tokens: 1200,
-          messages: [
-            { role: 'system', content: systemInstruction },
-            { role: 'user', content: prompt },
-          ],
-        }),
-        signal: AbortSignal.timeout(ANSWER_TIMEOUT_MS),
-      });
-      if (!response.ok || !response.body) throw new Error(`Groq returned ${response.status}`);
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      while (true) {
-        const { value, done } = await reader.read();
-        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
-          const event = JSON.parse(line.slice(6)) as { choices?: Array<{ delta?: { content?: string } }> };
-          const text = event.choices?.[0]?.delta?.content;
-          if (text) onText(text);
-        }
-        if (done) break;
-      }
+      const answer = await requestGroq(prompt, systemInstruction);
+      if (!answer) throw new Error('Groq returned an empty answer');
+      onText(answer);
       return Date.now() - startTime;
     } catch (error: any) {
-      console.warn('Groq streaming failed; using Ollama fallback:', error?.message);
+      console.warn('Groq answer failed; using Ollama fallback:', error?.message);
     }
   }
 
