@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
 import { getDocumentById, getDocumentChunks, getOrCreateConversation, createConversationMessage } from '@/lib/store';
-import { generateEmbedding, retrieveTopK, streamGroundedAnswer } from '@/lib/rag';
+import { generateEmbedding, generateGroundedAnswer, retrieveTopK, streamGroundedAnswer } from '@/lib/rag';
 import { consumeRateLimit } from '@/lib/rate-limit';
 import { elapsed, logTiming, serverTiming } from '@/lib/timing';
 import { invalidateCached } from '@/lib/query-cache';
@@ -135,6 +135,30 @@ export async function POST(
       content: question.trim(),
       expiresAt,
     });
+
+    if (process.env.AI_PROVIDER === 'groq') {
+      const generated = await generateGroundedAnswer(question.trim(), retrievedChunks);
+      const expiresAt = authUser.isDemo && authUser.expiresAt ? new Date(authUser.expiresAt) : undefined;
+      await createConversationMessage({
+        conversationId: conversation._id,
+        userId: authUser.userId,
+        documentId: id,
+        role: 'assistant',
+        content: generated.answer,
+        sources: sources.map((source) => ({ page: source.pageNumber, chunkId: String(source.chunkIndex), score: source.similarity })),
+        expiresAt,
+      });
+      invalidateCached(`conversation:${conversation._id}`);
+      return NextResponse.json({
+        type: 'complete',
+        question: question.trim(),
+        answer: generated.answer,
+        sources,
+        latencyMs: generated.latencyMs,
+        documentId: id,
+        documentTitle: doc.title,
+      });
+    }
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({

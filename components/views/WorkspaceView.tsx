@@ -187,6 +187,7 @@ export default function WorkspaceView({
     setQueryStage('Searching document…');
 
     try {
+      let data: any = null;
       const res = await fetch(`/api/documents/${doc._id}/chat`, {
         method: 'POST',
         signal: controller.signal,
@@ -205,11 +206,14 @@ export default function WorkspaceView({
         throw new Error(data.error || 'Failed to generate answer.');
       }
 
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
       if (!res.body) throw new Error('The answer stream was unavailable.');
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      let data: any = null;
       while (true) {
         const { value, done } = await reader.read();
         if (value) buffer += decoder.decode(value, { stream: !done });
@@ -238,6 +242,7 @@ export default function WorkspaceView({
         } catch (error) {
           if (error instanceof Error && error.message !== 'Unexpected end of JSON input') throw error;
         }
+      }
       }
       if (!data) throw new Error('The answer stream ended before completion.');
 
