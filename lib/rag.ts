@@ -8,7 +8,7 @@ const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:3b';
 const GROQ_BASE_URL = (process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1').replace(/\/$/, '');
 const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
 const PUTER_BASE_URL = (process.env.PUTER_BASE_URL || 'https://api.puter.com/puterai/openai/v1').replace(/\/$/, '');
-const PUTER_MODEL = process.env.PUTER_MODEL || 'gemini:gemini-3.8-flash';
+const PUTER_MODEL = process.env.PUTER_MODEL || 'openai/gpt-oss-20b';
 const OPENROUTER_BASE_URL = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-oss-20b:free';
 

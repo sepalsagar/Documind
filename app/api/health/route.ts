@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     aiProvider: process.env.AI_PROVIDER || 'ollama',
     hasGroqKey: Boolean(process.env.GROQ_API_KEY),
     groqModel: process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
-    puterModel: process.env.PUTER_MODEL || 'gemini:gemini-3.8-flash',
+    puterModel: process.env.PUTER_MODEL || 'openai/gpt-oss-20b',
     hasOpenRouterKey: Boolean(process.env.OPENROUTER_API_KEY),
     openRouterModel: process.env.OPENROUTER_MODEL || 'openai/gpt-oss-20b:free',
     hasOllamaConfig: Boolean(process.env.OLLAMA_BASE_URL || process.env.OLLAMA_MODEL),

@@ -20,8 +20,8 @@ passages and page numbers behind each answer.
   status without returning secrets.
 - Uploads are limited to 10 MB and 100 pages and must contain a PDF header.
 - Scanned/image-only PDFs are not OCR'd yet; upload an OCR'd or text-based PDF.
-- Puter is used when `PUTER_AUTH_TOKEN` is configured through its
-  OpenAI-compatible endpoint. OpenRouter and Ollama remain supported fallbacks.
+- Groq is used in production through its OpenAI-compatible endpoint. Puter,
+  OpenRouter, and Ollama remain supported alternatives.
   Local deterministic embeddings and a grounded excerpt fallback keep development
   and test flows usable without a hosted provider.
 
@@ -48,10 +48,10 @@ demo data expires after 24 hours.
 
 1. Install dependencies:
    `npm install`
-2. Copy `.env.example` to `.env.local`, then set `PUTER_AUTH_TOKEN` and a strong
-   server-only `JWT_SECRET` (for example, `openssl rand -base64 48`). The default
-   Puter model is `gemini:gemini-3.8-flash`. Do not
-   commit `.env.local`.
+2. Copy `.env.example` to `.env.local`, then set `GROQ_API_KEY` and a strong
+   server-only `JWT_SECRET` (for example, `openssl rand -base64 48`). Set
+   `AI_PROVIDER=groq` and `GROQ_MODEL=openai/gpt-oss-20b` for hosted generation.
+   Do not commit `.env.local`.
 3. Run the app:
    `npm run dev`
 
