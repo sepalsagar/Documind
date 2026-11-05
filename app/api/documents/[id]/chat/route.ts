@@ -149,6 +149,9 @@ export async function POST(
             answer += text;
             send({ type: 'text', text });
           });
+          if (!answer.trim()) {
+            throw new Error('The configured AI provider returned an empty answer.');
+          }
           send({
             type: 'complete',
             question: question.trim(),

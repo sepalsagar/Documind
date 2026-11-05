@@ -212,8 +212,7 @@ export default function WorkspaceView({
       let data: any = null;
       while (true) {
         const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
+        if (value) buffer += decoder.decode(value, { stream: !done });
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
         for (const line of lines) {
@@ -229,6 +228,7 @@ export default function WorkspaceView({
           if (event.type === 'error') throw new Error(event.error || 'The answer could not be completed.');
           if (event.type === 'complete') data = event;
         }
+        if (done) break;
       }
       if (buffer.trim()) {
         try {
