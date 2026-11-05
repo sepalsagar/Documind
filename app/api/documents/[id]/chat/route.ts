@@ -91,10 +91,10 @@ export async function POST(
       .filter((chunk) => Number.isInteger(chunk.pageNumber) && chunk.pageNumber >= 1 && chunk.pageNumber <= doc.pageCount);
     timings.vectorSearch = elapsed(searchStarted);
 
-    // A top-K list always has a "best" entry, even when it is unrelated. Do
-    // not turn that implementation detail into an apparently grounded answer.
-    const hasSufficientEvidence = retrievedChunks.length > 0 && retrievedChunks[0].similarity >= 0.12;
-    if (!hasSufficientEvidence) {
+    // The top result is still useful context for short and single-chunk
+    // documents, where hash-based local embeddings can produce a low score.
+    // The model receives the passage and must still answer only from it.
+    if (retrievedChunks.length === 0) {
       const expiresAt = authUser.isDemo && authUser.expiresAt ? new Date(authUser.expiresAt) : undefined;
       const conversation = await getOrCreateConversation(authUser.userId, id, expiresAt);
       await createConversationMessage({ conversationId: conversation._id, userId: authUser.userId, documentId: id, role: 'user', content: question.trim(), expiresAt });
